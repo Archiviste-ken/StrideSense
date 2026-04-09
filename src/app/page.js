@@ -1,65 +1,103 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useRef, useState } from "react";
+import { useAssistiveFeedback } from "../hooks/useAssistiveFeedback";
+
+const ASSISTANCE_STATUS = {
+  idle: "Idle",
+  tracking: "Tracking location…",
+  smartDetection: "Coming Soon: Smart Detection",
+};
+
+export default function HomePage() {
+  const [isActive, setIsActive] = useState(false);
+  const [status, setStatus] = useState(ASSISTANCE_STATUS.idle);
+  const { speak, vibrate } = useAssistiveFeedback();
+  const timerRef = useRef(null);
+
+  const handleToggleAssistance = () => {
+    const nextActive = !isActive;
+    setIsActive(nextActive);
+    vibrate(200);
+
+    if (nextActive) {
+      setStatus(ASSISTANCE_STATUS.tracking);
+
+      if (typeof window !== "undefined" && "geolocation" in navigator) {
+        try {
+          navigator.geolocation.getCurrentPosition(
+            () => {
+              // Location acquired; no-op for prototype
+            },
+            () => {
+              // Ignore location errors in prototype
+            },
+          );
+        } catch {
+          // Ignore unexpected geolocation errors
+        }
+      }
+
+      if (typeof window !== "undefined") {
+        if (timerRef.current) {
+          window.clearTimeout(timerRef.current);
+        }
+
+        timerRef.current = window.setTimeout(() => {
+          setStatus(ASSISTANCE_STATUS.smartDetection);
+        }, 3000);
+      }
+
+      speak("Assistance started");
+    } else {
+      if (typeof window !== "undefined" && timerRef.current) {
+        window.clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+
+      setStatus(ASSISTANCE_STATUS.idle);
+      speak("Assistance stopped");
+    }
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.js file.
+    <main className="flex-1 px-4 pt-6 pb-24 w-full max-w-md md:max-w-xl lg:max-w-2xl mx-auto">
+      <section aria-labelledby="home-title" className="space-y-6">
+        <header className="space-y-1">
+          <p className="text-sm text-slate-300">StrideSense</p>
+          <h1
+            id="home-title"
+            className="text-2xl md:text-3xl font-semibold tracking-tight text-white"
+          >
+            Smart Assistive System
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p className="text-sm text-slate-400">
+            Crossing assistant prototype for visually impaired users.
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+        </header>
+
+        <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 shadow-lg">
+          <button
+            type="button"
+            onClick={handleToggleAssistance}
+            aria-label={
+              isActive ? "Stop assistance" : "Start assistance for crossing"
+            }
+            className="w-full min-h-[72px] rounded-2xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+            {isActive ? "Stop Assistance" : "Start Assistance"}
+          </button>
+
+          <p className="text-sm md:text-base text-slate-200" aria-live="polite">
+            {status}
+          </p>
+
+          <ul className="space-y-1 text-xs md:text-sm text-slate-400">
+            <li>Tracking location when assistance is active.</li>
+            <li>Coming Soon: Smart Detection for safer crossings.</li>
+          </ul>
         </div>
-      </main>
-    </div>
+      </section>
+    </main>
   );
 }
