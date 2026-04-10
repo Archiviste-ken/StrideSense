@@ -40,7 +40,7 @@ export default function ProfilePage() {
               type="button"
               onClick={() => handleAction("Manage Contacts")}
               aria-label="Manage contacts for assistance"
-              className="w-full min-h-[64px] rounded-2xl bg-slate-800 text-base md:text-lg font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-slate-700 active:bg-slate-800/80 transition-colors"
+              className="w-full min-h-[76px] rounded-3xl bg-slate-800 text-lg md:text-xl font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-slate-700 active:bg-slate-800/80 transition-colors"
             >
               Manage Contacts
             </button>
@@ -49,7 +49,7 @@ export default function ProfilePage() {
               type="button"
               onClick={() => handleAction("Preferences")}
               aria-label="Open accessibility and app preferences"
-              className="w-full min-h-[64px] rounded-2xl bg-slate-800 text-base md:text-lg font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-slate-700 active:bg-slate-800/80 transition-colors"
+              className="w-full min-h-[76px] rounded-3xl bg-slate-800 text-lg md:text-xl font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-slate-700 active:bg-slate-800/80 transition-colors"
             >
               Preferences
             </button>
