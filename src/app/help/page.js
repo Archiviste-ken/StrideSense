@@ -20,7 +20,7 @@ export default function HelpPage() {
     }
   };
 
-  const handleVolunteer = () => {
+  const handleHelper = () => {
     speak("Requesting assistance. Feature coming soon.");
     vibrate(200);
     setMessage("Requesting assistance… Feature coming soon.");
@@ -43,14 +43,14 @@ export default function HelpPage() {
             Get Help
           </h1>
           <p className="text-sm text-slate-400">
-            Quickly reach volunteers or emergency contacts.
+            Quickly reach helpers or emergency contacts.
           </p>
         </header>
 
         <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 shadow-lg">
           <button
             type="button"
-            onClick={handleVolunteer}
+            onClick={handleHelper}
             aria-label="Call a helper for assistance"
             className="w-full min-h-[72px] rounded-2xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
           >
