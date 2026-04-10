@@ -67,26 +67,26 @@ The diagram below shows how a user moves through StrideSense today, and how the 
 
 ```mermaid
 flowchart TD
-  A[👤 User opens StrideSense<br/>Mobile / Tablet] --> B[🏠 Home / Crossing Assistant]
-  B -->|Tap Start Assistance| C[📍 Geolocation check<br/>+ Voice & Haptics]
-  C --> D[🧠 Smart Detection (Coming Soon)]
-  B -->|Tap Bottom Nav| E[📷 Camera Assist]
-  B -->|Tap Bottom Nav| F[🆘 Get Help]
-  B -->|Tap Bottom Nav| G[👤 Profile & Settings]
+  A[👤 User opens StrideSense on device] --> B[🏠 Home / Crossing Assistant]
+  B -->|Tap Start Assistance| C[📍 Geolocation + voice + haptics]
+  C --> D[🧠 Smart Detection (coming soon)]
+  B -->|Tap bottom nav| E[📷 Camera Assist]
+  B -->|Tap bottom nav| F[🆘 Get Help]
+  B -->|Tap bottom nav| G[👤 Profile & Settings]
 
-  E -->|Open / Take / History| H["UI feedback only\n(Feature Coming Soon)"]
-  F -->|Call Volunteer / Emergency| I[Voice + Vibration + Alert]
-  G -->|Manage Contacts / Preferences| J["UI feedback only\n(Backend Coming Soon)"]
+  E -->|Open / Take / History| H[UI feedback only – feature coming soon]
+  F -->|Call Volunteer / Emergency| I[Voice + vibration + alert]
+  G -->|Manage Contacts / Preferences| J[UI feedback only – backend coming soon]
 
-  subgraph Future Backend (Not Implemented Yet)
+  subgraph FutureBackend[Future Backend – not implemented yet]
     K[(API Gateway)] --> L[(MongoDB)]
-    K --> M[Safety / Smart Detection Engine]
+    K --> M[Safety / Smart Detection engine]
   end
 
-  D -. Planned Integration .-> K
-  H -. Planned Integration .-> K
-  I -. Planned Integration .-> K
-  J -. Planned Integration .-> K
+  D -. planned integration .-> K
+  H -. planned integration .-> K
+  I -. planned integration .-> K
+  J -. planned integration .-> K
 ```
 
 Use this as a living map when you later wire up real APIs and persistence.
