@@ -83,7 +83,7 @@ export default function HomePage() {
             aria-label={
               isActive ? "Stop assistance" : "Start assistance for crossing"
             }
-            className="w-full min-h-[72px] rounded-2xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
+            className="w-full min-h-[88px] rounded-3xl bg-sky-500 text-xl md:text-2xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
           >
             {isActive ? "Stop Assistance" : "Start Assistance"}
           </button>
