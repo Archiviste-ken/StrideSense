@@ -51,10 +51,10 @@ export default function HelpPage() {
           <button
             type="button"
             onClick={handleVolunteer}
-            aria-label="Call a volunteer for assistance"
+            aria-label="Call a helper for assistance"
             className="w-full min-h-[72px] rounded-2xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
           >
-            Call a Volunteer
+            Call a Helper
           </button>
 
           <button
