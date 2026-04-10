@@ -61,38 +61,6 @@ This project is built with the **Next.js App Router** and is intended as a clean
 
 ---
 
-## 🔄 High‑Level Flow
-
-The diagram below shows how a user moves through StrideSense today, and how the future backend would slot in behind the same UI.
-
-```mermaid
-flowchart TD
-  A[👤 User opens StrideSense on device] --> B[🏠 Home / Crossing Assistant]
-  B -->|Tap Start Assistance| C[📍 Geolocation + voice + haptics]
-  C --> D[🧠 Smart Detection (coming soon)]
-  B -->|Tap bottom nav| E[📷 Camera Assist]
-  B -->|Tap bottom nav| F[🆘 Get Help]
-  B -->|Tap bottom nav| G[👤 Profile & Settings]
-
-  E -->|Open / Take / History| H[UI feedback only – feature coming soon]
-  F -->|Call Volunteer / Emergency| I[Voice + vibration + alert]
-  G -->|Manage Contacts / Preferences| J[UI feedback only – backend coming soon]
-
-  subgraph FutureBackend[Future Backend – not implemented yet]
-    K[(API Gateway)] --> L[(MongoDB)]
-    K --> M[Safety / Smart Detection engine]
-  end
-
-  D -. planned integration .-> K
-  H -. planned integration .-> K
-  I -. planned integration .-> K
-  J -. planned integration .-> K
-```
-
-Use this as a living map when you later wire up real APIs and persistence.
-
----
-
 ## 🧭 Application Structure
 
 Key paths inside `src/app`:
