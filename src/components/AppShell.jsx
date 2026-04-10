@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAssistiveFeedback } from "../hooks/useAssistiveFeedback";
 
 const TABS = [
   { href: "/", label: "Home" },
@@ -12,6 +13,7 @@ const TABS = [
 
 export function AppShell({ children }) {
   const pathname = usePathname();
+  const { announceNavigation } = useAssistiveFeedback();
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
@@ -29,7 +31,8 @@ export function AppShell({ children }) {
                 <Link
                   href={tab.href}
                   aria-label={`Go to ${tab.label} page`}
-                  className={`flex flex-col items-center justify-center rounded-2xl py-2 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
+                  onClick={() => announceNavigation(tab.label)}
+                  className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
                       ? "bg-sky-500 text-white"
                       : "text-slate-300 hover:bg-slate-800"
