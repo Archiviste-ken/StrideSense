@@ -41,5 +41,15 @@ export function useAssistiveFeedback() {
     [speak, vibrate],
   );
 
-  return { speak, vibrate, notifyComingSoon };
+  const announceNavigation = useCallback(
+    (label) => {
+      if (!label) return;
+      const message = `Opening ${label} tab`;
+      vibrate(120);
+      speak(message);
+    },
+    [speak, vibrate],
+  );
+
+  return { speak, vibrate, notifyComingSoon, announceNavigation };
 }
