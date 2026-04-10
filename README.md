@@ -6,7 +6,7 @@
 
 Accessible, mobile‑first prototype focused on safe navigation, clear feedback, and a calm dark UI.
 
-[Live Demo](https://your-deployment-url.com) · [Report Issue](https://github.com/your-org/stride-sense/issues)
+[Live Demo](https://stride-sense-delta.vercel.app/) · [Report Issue](https://github.com/your-org/stride-sense/issues)
 
 </div>
 
