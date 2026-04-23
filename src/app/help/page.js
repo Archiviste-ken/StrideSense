@@ -150,7 +150,7 @@ export default function HelpPage() {
       setMessage("Waiting for a helper...");
 
       const roomId = Math.random().toString(36).substring(2, 10);
-      const meetLink = `https://meet.google.com/lookup/${roomId}`;
+      const meetLink = `https://meet.google.com/${roomId}`;
       const docRef = await addDoc(collection(db, "requests"), {
         id: meetLink,
         status: "waiting",
