@@ -228,7 +228,10 @@ export default function HelpPage() {
           speak("Connecting to user");
           vibrate([100, 50, 100]);
 
-          window.location.href = `https://meet.jit.si/${data.id}`;
+           
+          const url = `https://meet.jit.si/${data.id}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&userInfo.displayName=Helper`;
+
+          window.location.href = url;
         }
       });
 
