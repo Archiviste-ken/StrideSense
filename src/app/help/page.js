@@ -1,35 +1,194 @@
 "use client";
 
-import { useState } from "react";
+import { useUserRole } from "@/hooks/useUserRole";
+import { db } from "@/lib/firebase";
+import {
+  addDoc,
+  collection,
+  doc,
+  getDoc,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
 
 export default function HelpPage() {
   const { speak, vibrate, notifyComingSoon } = useAssistiveFeedback();
+  const { role } = useUserRole();
   const [message, setMessage] = useState(
     "Live assistance feature coming soon.",
   );
+  const [isRequesting, setIsRequesting] = useState(false);
+  const [requestId, setRequestId] = useState(null);
+  const [incomingRequest, setIncomingRequest] = useState(null);
+  const [isAccepting, setIsAccepting] = useState(false);
+  const helperRedirected = useRef(false);
+  const blindRedirected = useRef(false);
 
-  const showComingSoonAlert = () => {
-    if (typeof window === "undefined") return;
+  useEffect(() => {
+    if (role !== "helper") {
+      setIncomingRequest(null);
+      return;
+    }
+
+    const q = query(
+      collection(db, "requests"),
+      orderBy("createdAt", "desc"),
+      limit(1),
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        setIncomingRequest(null);
+        return;
+      }
+
+      const docSnap = snapshot.docs[0];
+      const data = docSnap.data();
+
+      if (data.status === "connected" && data.id) {
+        if (helperRedirected.current) return;
+
+        helperRedirected.current = true;
+        speak("Connecting to user");
+        vibrate([100, 50, 100]);
+        window.location.href = `https://meet.jit.si/${data.id}`;
+        return;
+      }
+
+      if (helperRedirected.current) {
+        return;
+      }
+
+      if (data.status === "waiting") {
+        setIncomingRequest({
+          id: docSnap.id,
+          ...data,
+        });
+        return;
+      }
+
+      setIncomingRequest(null);
+    });
+
+    return () => unsubscribe();
+  }, [role, speak, vibrate]);
+
+  useEffect(() => {
+    if (role !== "blind" || !requestId) return;
+
+    const requestRef = doc(db, "requests", requestId);
+
+    const unsubscribe = onSnapshot(requestRef, (snap) => {
+      if (!snap.exists()) return;
+
+      const data = snap.data();
+
+      if (data.status === "connected" && data.id) {
+        if (blindRedirected.current) return;
+
+        blindRedirected.current = true;
+        speak("Helper connected");
+        vibrate([100, 50, 100]);
+        setMessage("Helper connected");
+        window.location.href = `https://meet.jit.si/${data.id}`;
+      }
+    });
+
+    return () => unsubscribe();
+  }, [requestId, role, speak, vibrate]);
+
+  const handleHelper = async () => {
+    if (role !== "blind") {
+      speak("Switch to assistance mode to request help");
+      return;
+    }
+
+    if (isRequesting) return;
 
     try {
-      // Simple blocking alert for clarity; acceptable in prototype.
-      window.alert("Feature coming soon");
-    } catch {
-      // Ignore alert errors
-    }
-  };
+      setIsRequesting(true);
 
-  const handleHelper = () => {
-    speak("Requesting assistance. Feature coming soon.");
-    vibrate(200);
-    setMessage("Requesting assistance… Feature coming soon.");
-    showComingSoonAlert();
+      speak("Requesting assistance");
+      vibrate(200);
+      setMessage("Waiting for a helper...");
+
+      const roomId = "room-" + Date.now();
+      const docRef = await addDoc(collection(db, "requests"), {
+        id: roomId,
+        status: "waiting",
+        takenBy: null,
+        createdAt: serverTimestamp(),
+      });
+
+      setRequestId(docRef.id);
+      speak("Request sent. Waiting for a helper");
+      vibrate(120);
+      setMessage("Request sent. Waiting for a helper...");
+    } catch (error) {
+      console.error(error);
+      speak("Failed to request help");
+      vibrate(150);
+      setMessage("Unable to request help. Try again.");
+    } finally {
+      setIsRequesting(false);
+    }
   };
 
   const handleEmergency = () => {
     setMessage("Emergency contact feature coming soon.");
     notifyComingSoon("Emergency contact feature coming soon");
+  };
+
+  const handleAcceptRequest = async () => {
+    if (!incomingRequest || isAccepting) return;
+
+    if (
+      incomingRequest.status !== "waiting" ||
+      incomingRequest.takenBy !== null
+    ) {
+      speak("Request already taken");
+      return;
+    }
+
+    try {
+      setIsAccepting(true);
+
+      const requestRef = doc(db, "requests", incomingRequest.id);
+      const latestSnap = await getDoc(requestRef);
+
+      if (!latestSnap.exists()) {
+        speak("Request not found");
+        return;
+      }
+
+      const latestData = latestSnap.data();
+
+      if (latestData.takenBy !== null) {
+        speak("Request already taken");
+        return;
+      }
+
+      await updateDoc(requestRef, {
+        takenBy: "helper-" + Date.now(),
+        status: "connected",
+      });
+
+      setMessage("Connecting to user...");
+      setIncomingRequest(null);
+    } catch (error) {
+      console.error(error);
+      speak("Unable to accept request");
+      vibrate(150);
+      setMessage("Unable to accept request. Try again.");
+    } finally {
+      setIsAccepting(false);
+    }
   };
 
   return (
@@ -52,7 +211,8 @@ export default function HelpPage() {
             type="button"
             onClick={handleHelper}
             aria-label="Call a helper for assistance"
-            className="w-full min-h-[88px] rounded-3xl bg-sky-500 text-xl md:text-2xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors"
+            disabled={isRequesting}
+            className="w-full min-h-[88px] rounded-3xl bg-sky-500 text-xl md:text-2xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           >
             Call a Helper
           </button>
@@ -66,7 +226,28 @@ export default function HelpPage() {
             Emergency Contact
           </button>
 
-          <p className="text-xs md:text-sm text-slate-400" aria-live="polite">
+          {role === "helper" && incomingRequest && (
+            <div className="rounded-3xl border border-sky-700 bg-sky-950/40 p-4 space-y-3">
+              <p className="text-sm md:text-base font-semibold text-sky-100">
+                Incoming request
+              </p>
+              <button
+                type="button"
+                onClick={handleAcceptRequest}
+                aria-label="Accept incoming help request"
+                disabled={isAccepting}
+                className="w-full min-h-[76px] rounded-3xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Accept Request
+              </button>
+            </div>
+          )}
+
+          <p
+            className="text-xs md:text-sm text-slate-400"
+            aria-live="polite"
+            data-request-id={requestId ?? undefined}
+          >
             {message}
           </p>
         </div>
