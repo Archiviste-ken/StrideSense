@@ -13,6 +13,7 @@ import {
   query,
   updateDoc,
   where,
+  arrayUnion,
 } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
@@ -32,6 +33,14 @@ export default function HelpPage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const helperRedirected = useRef(false);
   const blindRedirected = useRef(false);
+  const localVideoRef = useRef(null);
+  const localStreamRef = useRef(null);
+  const peerConnectionRef = useRef(null);
+  const remoteVideoRef = useRef(null);
+  const addedCallerCandidates = useRef(new Set());
+  const addedCalleeCandidates = useRef(new Set());
+  const pendingCallerCandidates = useRef([]);
+  const pendingCalleeCandidates = useRef([]);
 
   useEffect(() => {
     if (typeof window === "undefined" || role !== "blind") return;
@@ -72,13 +81,33 @@ export default function HelpPage() {
       if (!data.createdAt || typeof data.createdAt !== "number") return;
 
       if (data.status === "connected") {
+        if (data.callerCandidates && peerConnectionRef.current) {
+          data.callerCandidates.forEach(c => {
+            const key = JSON.stringify(c);
+            if (!addedCallerCandidates.current.has(key)) {
+              addedCallerCandidates.current.add(key);
+              if (
+                peerConnectionRef.current &&
+                peerConnectionRef.current.remoteDescription
+              ) {
+                try {
+                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                } catch (e) {
+                  console.error("ICE error", e);
+                }
+              } else {
+                pendingCallerCandidates.current.push(c);
+              }
+            }
+          });
+        }
+
         if (helperRedirected.current) return;
-        if (!data.id || typeof data.id !== "string" || !data.id.startsWith("https://meet.google.com")) return;
 
         helperRedirected.current = true;
         speak("Connecting to user");
         vibrate([100, 50, 100]);
-        window.location.href = data.id;
+        console.log("Redirect blocked for WebRTC setup");
         return;
       }
 
@@ -89,7 +118,6 @@ export default function HelpPage() {
       if (data.status === "waiting") {
         setIncomingRequest({
           docId: docSnap.id,
-          roomId: data.id,
           ...data,
         });
         return;
@@ -106,14 +134,34 @@ export default function HelpPage() {
 
     const requestRef = doc(db, "requests", docId);
 
-    const unsubscribe = onSnapshot(requestRef, (snap) => {
+    const unsubscribe = onSnapshot(requestRef, async (snap) => {
       if (!snap.exists()) return;
 
       const data = snap.data();
 
       if (data.status === "connected") {
+        if (data.calleeCandidates && peerConnectionRef.current) {
+          data.calleeCandidates.forEach(c => {
+            const key = JSON.stringify(c);
+            if (!addedCalleeCandidates.current.has(key)) {
+              addedCalleeCandidates.current.add(key);
+              if (
+                peerConnectionRef.current &&
+                peerConnectionRef.current.remoteDescription
+              ) {
+                try {
+                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                } catch (e) {
+                  console.error("ICE error", e);
+                }
+              } else {
+                pendingCalleeCandidates.current.push(c);
+              }
+            }
+          });
+        }
+
         if (blindRedirected.current) return;
-        if (!data.id || typeof data.id !== "string" || !data.id.startsWith("https://meet.google.com")) return;
 
         blindRedirected.current = true;
         if (typeof window !== "undefined") {
@@ -122,12 +170,75 @@ export default function HelpPage() {
         speak("Helper connected");
         vibrate([100, 50, 100]);
         setMessage("Helper connected");
-        window.location.href = data.id;
+        console.log("Redirect blocked for WebRTC setup");
+
+        if (data.answer && peerConnectionRef.current) {
+          await peerConnectionRef.current.setRemoteDescription(
+            new RTCSessionDescription(data.answer)
+          );
+
+          pendingCalleeCandidates.current.forEach(c => {
+            try {
+              peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+            } catch (e) {
+              console.error("ICE error", e);
+            }
+          });
+          pendingCalleeCandidates.current = [];
+        }
       }
     });
 
     return () => unsubscribe();
   }, [docId, role, speak, vibrate]);
+
+  async function startLocalStream() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+      localStreamRef.current = stream;
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error("Camera/Mic error:", err);
+    }
+  }
+
+  function createPeerConnection() {
+    const pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: "stun:stun.l.google.com:19302" },
+        { urls: "stun:stun1.l.google.com:19302" },
+        { urls: "stun:stun2.l.google.com:19302" }
+      ]
+    });
+
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach((track) => {
+        pc.addTrack(track, localStreamRef.current);
+      });
+    }
+
+    pc.ontrack = (event) => {
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = event.streams[0];
+      }
+    };
+
+    peerConnectionRef.current = pc;
+    return pc;
+  }
+
+  useEffect(() => {
+    return () => {
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((track) => track.stop());
+      }
+    };
+  }, []);
 
   const handleHelper = async () => {
     if (role !== "blind") {
@@ -144,19 +255,37 @@ export default function HelpPage() {
 
     try {
       setIsRequesting(true);
+      await startLocalStream();
+
+      const pc = createPeerConnection();
+
+
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
 
       speak("Requesting assistance");
       vibrate(200);
       setMessage("Waiting for a helper...");
 
       const roomId = Math.random().toString(36).substring(2, 10);
-      const meetLink = `https://meet.google.com/${roomId}`;
       const docRef = await addDoc(collection(db, "requests"), {
-        id: meetLink,
+        id: roomId,
         status: "waiting",
         takenBy: null,
         createdAt: Date.now(),
+        offer: offer,
+        answer: null,
       });
+
+      const requestRef = doc(db, "requests", docRef.id);
+
+      pc.onicecandidate = async (event) => {
+        if (event.candidate) {
+          await updateDoc(requestRef, {
+            callerCandidates: arrayUnion(event.candidate.toJSON())
+          });
+        }
+      };
 
       setDocId(docRef.id);
       if (typeof window !== "undefined") {
@@ -193,6 +322,7 @@ export default function HelpPage() {
 
     try {
       setIsAccepting(true);
+      await startLocalStream();
 
       const requestRef = doc(db, "requests", incomingRequest.docId);
       const latestSnap = await getDoc(requestRef);
@@ -209,18 +339,44 @@ export default function HelpPage() {
         return;
       }
 
+      const pc = createPeerConnection();
+
+      pc.onicecandidate = async (event) => {
+        if (event.candidate && incomingRequest.docId) {
+          const requestRef = doc(db, "requests", incomingRequest.docId);
+          await updateDoc(requestRef, {
+            calleeCandidates: arrayUnion(event.candidate.toJSON())
+          });
+        }
+      };
+      await pc.setRemoteDescription(
+        new RTCSessionDescription(latestData.offer)
+      );
+
+      pendingCallerCandidates.current.forEach(c => {
+        try {
+          peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+        } catch (e) {
+          console.error("ICE error", e);
+        }
+      });
+      pendingCallerCandidates.current = [];
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
       await updateDoc(requestRef, {
         takenBy: "helper-" + Date.now(),
         status: "connected",
+        answer: answer,
       });
 
       speak("Connecting to user");
       vibrate([100, 50, 100]);
 
-      if (!latestData.id || typeof latestData.id !== "string" || !latestData.id.startsWith("https://meet.google.com")) return;
+
       if (helperRedirected.current) return;
       helperRedirected.current = true;
-      window.location.href = latestData.id;
+      console.log("Redirect blocked for WebRTC setup");
 
     
 
@@ -297,6 +453,19 @@ export default function HelpPage() {
           </p>
         </div>
       </section>
+      <video
+        ref={localVideoRef}
+        autoPlay
+        muted
+        playsInline
+        className="hidden"
+      />
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className="hidden"
+      />
     </main>
   );
 }
