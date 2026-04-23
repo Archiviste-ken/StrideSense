@@ -17,6 +17,11 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
 
+
+  function buildJitsiUrl(roomId, name = "User") {
+  return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&config.enableWelcomePage=false&interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&userInfo.displayName=${encodeURIComponent(name)}`;
+}
+
 export default function HelpPage() {
   const { speak, vibrate, notifyComingSoon } = useAssistiveFeedback();
   const { role } = useUserRole();
@@ -75,7 +80,8 @@ export default function HelpPage() {
         helperRedirected.current = true;
         speak("Connecting to user");
         vibrate([100, 50, 100]);
-        window.location.href = `https://meet.jit.si/${data.id}`;
+       const url = buildJitsiUrl(data.id, "Helper");
+         window.location.href = url;
         return;
       }
 
@@ -119,7 +125,8 @@ export default function HelpPage() {
         speak("Helper connected");
         vibrate([100, 50, 100]);
         setMessage("Helper connected");
-        window.location.href = `https://meet.jit.si/${data.id}`;
+        const url = buildJitsiUrl(data.id, "Blind User");
+         window.location.href = url;
       }
     });
 
@@ -210,30 +217,15 @@ export default function HelpPage() {
         status: "connected",
       });
 
-      const acceptedDocId = incomingRequest.docId;
-      const connectedRef = doc(db, "requests", acceptedDocId);
+        const url = buildJitsiUrl(incomingRequest.roomId, "Helper");
 
-      onSnapshot(connectedRef, (snap) => {
-        if (!snap.exists()) return;
-
-        const data = snap.data();
-
-        if (data.status === "connected") {
-          if (helperRedirected.current) return;
-
-          if (!data.id || typeof data.id !== "string") return;
-
-          helperRedirected.current = true;
-
-          speak("Connecting to user");
-          vibrate([100, 50, 100]);
-
-           
-          const url = `https://meet.jit.si/${data.id}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&userInfo.displayName=Helper`;
+         helperRedirected.current = true;
+         speak("Connecting to user");
+           vibrate([100, 50, 100]);
 
           window.location.href = url;
-        }
-      });
+
+    
 
       setMessage("Connecting to user...");
       setIncomingRequest(null);
