@@ -222,9 +222,22 @@ export default function HelpPage() {
       });
     }
 
+    pc.onconnectionstatechange = () => {
+      console.log("Connection state:", pc.connectionState);
+    };
+
+    pc.oniceconnectionstatechange = () => {
+      console.log("ICE state:", pc.iceConnectionState);
+    };
+
     pc.ontrack = (event) => {
+      console.log("TRACK RECEIVED:", event.streams);
+
       if (remoteVideoRef.current) {
-        remoteVideoRef.current.srcObject = event.streams[0];
+        const video = remoteVideoRef.current;
+        video.srcObject = event.streams[0];
+        video.muted = true; // allow autoplay on mobile
+        video.play().catch(() => {});
       }
     };
 
@@ -464,7 +477,8 @@ export default function HelpPage() {
         ref={remoteVideoRef}
         autoPlay
         playsInline
-        className="hidden"
+        muted
+        className="w-full h-64 rounded-xl bg-black object-cover"
       />
     </main>
   );
