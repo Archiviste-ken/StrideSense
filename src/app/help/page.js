@@ -37,10 +37,36 @@ export default function HelpPage() {
   const localStreamRef = useRef(null);
   const peerConnectionRef = useRef(null);
   const remoteVideoRef = useRef(null);
+  const remoteAudioRef = useRef(null);
+  const audioReadyRef = useRef(false);
+  const userInteractedRef = useRef(false);
   const addedCallerCandidates = useRef(new Set());
   const addedCalleeCandidates = useRef(new Set());
   const pendingCallerCandidates = useRef([]);
   const pendingCalleeCandidates = useRef([]);
+
+  const tryPlayAudio = () => {
+    if (
+      remoteAudioRef.current &&
+      audioReadyRef.current &&
+      userInteractedRef.current
+    ) {
+      remoteAudioRef.current.play().catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    const handler = () => {
+      userInteractedRef.current = true;
+      tryPlayAudio();
+    };
+
+    document.body.addEventListener("click", handler);
+
+    return () => {
+      document.body.removeEventListener("click", handler);
+    };
+  }, []);
 
   useEffect(() => {
     if (typeof window === "undefined" || role !== "blind") return;
@@ -233,11 +259,26 @@ export default function HelpPage() {
     pc.ontrack = (event) => {
       console.log("TRACK RECEIVED:", event.streams);
 
+      const stream = event.streams[0];
+
+      // VIDEO
       if (remoteVideoRef.current) {
         const video = remoteVideoRef.current;
-        video.srcObject = event.streams[0];
-        video.muted = true; // allow autoplay on mobile
+        video.srcObject = stream;
+        video.muted = true; // keep video muted for autoplay
         video.play().catch(() => {});
+      }
+
+      // AUDIO (SEPARATE)
+      if (remoteAudioRef.current) {
+        const audio = remoteAudioRef.current;
+        audio.srcObject = stream;
+        audio.muted = false;
+        audio.volume = 1;
+        audioReadyRef.current = true;
+
+        console.log("Audio tracks:", stream.getAudioTracks());
+        tryPlayAudio();
       }
     };
 
@@ -479,6 +520,11 @@ export default function HelpPage() {
         playsInline
         muted
         className="w-full h-64 rounded-xl bg-black object-cover"
+      />
+      <audio
+        ref={remoteAudioRef}
+        autoPlay
+        playsInline
       />
     </main>
   );
