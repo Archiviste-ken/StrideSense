@@ -68,6 +68,7 @@ export default function HelpPage() {
     };
   }, []);
 
+
   useEffect(() => {
     if (typeof window === "undefined" || role !== "blind") return;
 
@@ -280,16 +281,58 @@ export default function HelpPage() {
     };
 
     pc.ontrack = (event) => {
-      console.log("TRACK RECEIVED:", event.streams);
+      console.log("TRACK RECEIVED");
+      
+      let stream = event.streams && event.streams[0];
 
-      const stream = event.streams[0];
+      if (!stream && event.track) {
+        // Fallback for browsers that don't provide streams
+        stream = new MediaStream([event.track]);
+      }
+      console.log("Tracks:", stream.getTracks());
+
+      const hasVideo = stream.getVideoTracks && stream.getVideoTracks().length > 0;
+
+      const videoTrack = stream.getVideoTracks()[0];
+
+      if (!videoTrack) {
+        console.error("❌ NO VIDEO TRACK");
+      } else {
+        console.log("✅ VIDEO TRACK READY:", videoTrack.readyState);
+        if (videoTrack.readyState === "ended") {
+          console.warn("⚠️ Video track ended — stream may need restart");
+        }
+        videoTrack.enabled = true;
+      }
 
       // VIDEO
-      if (remoteVideoRef.current) {
+      if (remoteVideoRef.current && hasVideo) {
         const video = remoteVideoRef.current;
-        video.srcObject = stream;
-        video.muted = true; // keep video muted for autoplay
-        video.play().catch(() => {});
+        if (!video) return;
+
+        console.log("Attaching stream with video tracks:", stream.getVideoTracks().length);
+        
+        if (video.srcObject !== stream) {
+          console.log("Updating video stream");
+          video.srcObject = stream;
+        }
+
+        video.muted = true;
+        video.playsInline = true;
+
+        if (videoTrack) {
+          if (videoTrack.readyState === "live") {
+            video.play().catch(() => {});
+          } else {
+            // Wait until track becomes live
+            if (!videoTrack._unmuteBound) {
+              videoTrack._unmuteBound = true;
+              videoTrack.addEventListener("unmute", () => {
+                video.play().catch(() => {});
+              }, { once: true });
+            }
+          }
+        }
       }
 
       // AUDIO (SEPARATE)
