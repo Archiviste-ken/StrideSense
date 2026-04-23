@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { addDoc, collection } from "firebase/firestore";
 import { db } from "../../lib/firebase";
-import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
+import { useAssistiveFeedback } from "@/hooks/useAssistiveFeedback";
 
 const INITIAL_MESSAGE =
   "Point your camera toward your surroundings, then take a picture for guidance.";
