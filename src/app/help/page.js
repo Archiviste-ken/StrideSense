@@ -18,22 +18,7 @@ import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
 
 
-  function buildJitsiUrl(roomId, name = "User") {
-  return `https://meet.jit.si/${roomId}#` +
-    `config.prejoinPageEnabled=false&` +
-    `config.disableDeepLinking=true&` +
-    `config.startWithAudioMuted=false&` +
-    `config.startWithVideoMuted=false&` +
-    `config.requireDisplayName=false&` +
-    `config.enableWelcomePage=false&` +
-    `config.enableClosePage=false&` +
-    `config.enableLobby=false&` +   // 🔥 IMPORTANT
-    `config.lobby.enable=false&` + // 🔥 DOUBLE DISABLE
-    `config.enableUserRolesBasedOnToken=false&` +
-    `config.p2p.enabled=true&` +
-    `interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&` +
-    `userInfo.displayName=${encodeURIComponent(name)}`;
-}
+
 
 export default function HelpPage() {
   const { speak, vibrate, notifyComingSoon } = useAssistiveFeedback();
@@ -88,13 +73,12 @@ export default function HelpPage() {
 
       if (data.status === "connected") {
         if (helperRedirected.current) return;
-        if (!data.id || typeof data.id !== "string") return;
+        if (!data.id || typeof data.id !== "string" || !data.id.startsWith("https://meet.google.com")) return;
 
         helperRedirected.current = true;
         speak("Connecting to user");
         vibrate([100, 50, 100]);
-       const url = buildJitsiUrl(data.id, "Helper");
-         window.location.href = url;
+        window.location.href = data.id;
         return;
       }
 
@@ -127,9 +111,9 @@ export default function HelpPage() {
 
       const data = snap.data();
 
-      if (data.status === "connecting") {
+      if (data.status === "connected") {
         if (blindRedirected.current) return;
-        if (!data.id || typeof data.id !== "string") return;
+        if (!data.id || typeof data.id !== "string" || !data.id.startsWith("https://meet.google.com")) return;
 
         blindRedirected.current = true;
         if (typeof window !== "undefined") {
@@ -138,10 +122,7 @@ export default function HelpPage() {
         speak("Helper connected");
         vibrate([100, 50, 100]);
         setMessage("Helper connected");
-        const url = buildJitsiUrl(data.id, "Blind User");
-        setTimeout(() => {
-          window.location.href = url;
-        }, 700);
+        window.location.href = data.id;
       }
     });
 
@@ -168,9 +149,10 @@ export default function HelpPage() {
       vibrate(200);
       setMessage("Waiting for a helper...");
 
-      const roomId = "room-" + Date.now();
+      const roomId = Math.random().toString(36).substring(2, 10);
+      const meetLink = `https://meet.google.com/lookup/${roomId}`;
       const docRef = await addDoc(collection(db, "requests"), {
-        id: roomId,
+        id: meetLink,
         status: "waiting",
         takenBy: null,
         createdAt: Date.now(),
@@ -229,18 +211,16 @@ export default function HelpPage() {
 
       await updateDoc(requestRef, {
         takenBy: "helper-" + Date.now(),
-        status: "connecting",
+        status: "connected",
       });
 
-        const url = buildJitsiUrl(incomingRequest.roomId, "Helper");
+      speak("Connecting to user");
+      vibrate([100, 50, 100]);
 
-         helperRedirected.current = true;
-         speak("Connecting to user");
-           vibrate([100, 50, 100]);
-
-          setTimeout(() => {
-            window.location.href = url;
-          }, 300);
+      if (!latestData.id || typeof latestData.id !== "string" || !latestData.id.startsWith("https://meet.google.com")) return;
+      if (helperRedirected.current) return;
+      helperRedirected.current = true;
+      window.location.href = latestData.id;
 
     
 
