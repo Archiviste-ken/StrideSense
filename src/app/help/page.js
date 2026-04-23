@@ -31,6 +31,7 @@ export default function HelpPage() {
   const [docId, setDocId] = useState(null);
   const [incomingRequest, setIncomingRequest] = useState(null);
   const [isAccepting, setIsAccepting] = useState(false);
+  const [facingMode, setFacingMode] = useState("user");
   const helperRedirected = useRef(false);
   const blindRedirected = useRef(false);
   const localVideoRef = useRef(null);
@@ -110,7 +111,7 @@ export default function HelpPage() {
       if (data.status === "connected") {
         if (data.callerCandidates && peerConnectionRef.current) {
           data.callerCandidates.forEach(c => {
-            const key = JSON.stringify(c);
+            const key = c.candidate || JSON.stringify(c);
             if (!addedCallerCandidates.current.has(key)) {
               addedCallerCandidates.current.add(key);
               if (
@@ -169,7 +170,7 @@ export default function HelpPage() {
       if (data.status === "connected") {
         if (data.calleeCandidates && peerConnectionRef.current) {
           data.calleeCandidates.forEach(c => {
-            const key = JSON.stringify(c);
+            const key = c.candidate || JSON.stringify(c);
             if (!addedCalleeCandidates.current.has(key)) {
               addedCalleeCandidates.current.add(key);
               if (
@@ -218,6 +219,76 @@ export default function HelpPage() {
 
     return () => unsubscribe();
   }, [docId, role, speak, vibrate]);
+
+  const endCall = () => {
+    try {
+      if (peerConnectionRef.current) {
+        peerConnectionRef.current.close();
+        peerConnectionRef.current = null;
+      }
+
+      if (localStreamRef.current) {
+        localStreamRef.current.getTracks().forEach((t) => t.stop());
+        localStreamRef.current = null;
+      }
+
+      if (remoteVideoRef.current) {
+        remoteVideoRef.current.srcObject = null;
+      }
+
+      if (remoteAudioRef.current) {
+        remoteAudioRef.current.srcObject = null;
+      }
+
+      helperRedirected.current = false;
+      blindRedirected.current = false;
+      setDocId(null);
+      setIncomingRequest(null);
+      setIsRequesting(false);
+      setIsAccepting(false);
+      audioReadyRef.current = false;
+      userInteractedRef.current = false;
+
+      setMessage("Call ended");
+    } catch (err) {
+      console.error("End call error:", err);
+    }
+  };
+
+  const switchCamera = async () => {
+    try {
+      const newFacing = facingMode === "user" ? "environment" : "user";
+      setFacingMode(newFacing);
+
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacing }
+      });
+
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      if (peerConnectionRef.current) {
+        const sender = peerConnectionRef.current
+          .getSenders()
+          .find((s) => s.track && s.track.kind === "video");
+
+        if (sender && newVideoTrack) {
+          await sender.replaceTrack(newVideoTrack);
+        }
+      }
+
+      if (localStreamRef.current) {
+        localStreamRef.current.getVideoTracks().forEach((t) => t.stop());
+      }
+
+      localStreamRef.current = newStream;
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = newStream;
+      }
+    } catch (err) {
+      console.error("Switch camera error:", err);
+    }
+  };
 
   async function startLocalStream() {
     try {
@@ -273,7 +344,14 @@ export default function HelpPage() {
     }
 
     pc.onconnectionstatechange = () => {
-      console.log("Connection state:", pc.connectionState);
+      const state = pc.connectionState;
+      console.log("Connection state:", state);
+
+      if (state === "connected") setMessage("Connected");
+      else if (state === "connecting") setMessage("Connecting...");
+      else if (state === "failed" || state === "closed") {
+        setMessage("Connection lost");
+      }
     };
 
     pc.oniceconnectionstatechange = () => {
@@ -585,8 +663,20 @@ export default function HelpPage() {
         autoPlay
         playsInline
         muted
-        className="w-full h-64 rounded-xl bg-black object-cover"
+        className="w-full h-[60vh] rounded-xl bg-black object-cover"
       />
+      <button
+        onClick={endCall}
+        className="mt-3 w-full py-3 bg-red-500 text-white rounded-xl font-semibold"
+      >
+        End Call
+      </button>
+      <button
+        onClick={switchCamera}
+        className="mt-3 w-full py-3 bg-sky-500 text-white rounded-xl font-semibold"
+      >
+        Switch Camera
+      </button>
       <audio
         ref={remoteAudioRef}
         autoPlay
