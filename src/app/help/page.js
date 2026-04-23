@@ -210,6 +210,28 @@ export default function HelpPage() {
         status: "connected",
       });
 
+      const acceptedDocId = incomingRequest.docId;
+      const connectedRef = doc(db, "requests", acceptedDocId);
+
+      onSnapshot(connectedRef, (snap) => {
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+
+        if (data.status === "connected") {
+          if (helperRedirected.current) return;
+
+          if (!data.id || typeof data.id !== "string") return;
+
+          helperRedirected.current = true;
+
+          speak("Connecting to user");
+          vibrate([100, 50, 100]);
+
+          window.location.href = `https://meet.jit.si/${data.id}`;
+        }
+      });
+
       setMessage("Connecting to user...");
       setIncomingRequest(null);
     } catch (error) {
