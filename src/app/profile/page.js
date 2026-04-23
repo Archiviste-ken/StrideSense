@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
+import { useUserRole } from "../../hooks/useUserRole";
 
 export default function ProfilePage() {
   const { notifyComingSoon } = useAssistiveFeedback();
+  const { role, setRole } = useUserRole();
   const [message, setMessage] = useState("Backend integration coming soon.");
 
   const handleAction = (label) => {
@@ -33,6 +35,47 @@ export default function ProfilePage() {
               Name
             </p>
             <p className="text-lg font-semibold text-white">Demo User</p>
+          </div>
+
+          <div className="space-y-2 pt-2">
+            <p className="text-xs uppercase tracking-wide text-slate-400">
+              Role
+            </p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setRole("blind");
+                  notifyComingSoon("You are now in assistance mode");
+                }}
+                aria-label="Select I need help role"
+                aria-pressed={role === "blind"}
+                className={`w-full min-h-[76px] rounded-3xl text-lg md:text-xl font-semibold shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 transition-colors ${
+                  role === "blind"
+                    ? "bg-sky-500 text-white"
+                    : "bg-slate-800 text-white hover:bg-slate-700 active:bg-slate-800/80"
+                }`}
+              >
+                I need help
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setRole("helper");
+                  notifyComingSoon("You are now in helper mode");
+                }}
+                aria-label="Select I am a helper role"
+                aria-pressed={role === "helper"}
+                className={`w-full min-h-[76px] rounded-3xl text-lg md:text-xl font-semibold shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 transition-colors ${
+                  role === "helper"
+                    ? "bg-sky-500 text-white"
+                    : "bg-slate-800 text-white hover:bg-slate-700 active:bg-slate-800/80"
+                }`}
+              >
+                I am a helper
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3 pt-2">
