@@ -89,6 +89,8 @@ export default function CameraPage() {
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
+        video.muted = true;
+        video.playsInline = true;
         await video.play();
       }
 
@@ -103,10 +105,13 @@ export default function CameraPage() {
   };
 
   useEffect(() => {
+    startCamera();
+
     return () => {
       stopAnalysisRequest();
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSwitchCamera = async () => {
@@ -263,15 +268,16 @@ export default function CameraPage() {
           aria-label="Camera preview area"
           className="relative min-h-[58vh] w-full overflow-hidden bg-slate-950"
         >
-          {isCameraActive ? (
-            <video
-              ref={videoRef}
-              className="absolute inset-0 h-full w-full object-cover"
-              playsInline
-              muted
-              aria-label="Live camera preview"
-            />
-          ) : (
+          <video
+            ref={videoRef}
+            className="absolute inset-0 h-full w-full object-cover"
+            autoPlay
+            playsInline
+            muted
+            aria-label="Live camera preview"
+          />
+
+          {!isCameraActive && (
             <div className="flex min-h-[58vh] items-center justify-center px-6 text-center">
               <div className="space-y-3">
                 <p className="text-3xl font-semibold text-white">
