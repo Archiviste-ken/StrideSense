@@ -21,6 +21,48 @@ export function useAssistiveFeedback() {
     }
   }, []);
 
+  const speakLongText = useCallback((text) => {
+    if (typeof window === "undefined") return;
+    if (!text) return;
+
+    const synth = window.speechSynthesis;
+    if (!synth) return;
+
+    try {
+      synth.cancel();
+
+      const sentences = text.replace(/\n/g, " ").split(/(?<=[.?!])\s+/);
+      let index = 0;
+
+      function speakNext() {
+        if (index >= sentences.length) return;
+
+        const sentence = sentences[index]?.trim();
+        if (!sentence) {
+          index += 1;
+          setTimeout(speakNext, 400);
+          return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(sentence);
+        utterance.rate = 0.85;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+
+        utterance.onend = () => {
+          index += 1;
+          setTimeout(speakNext, 400);
+        };
+
+        synth.speak(utterance);
+      }
+
+      speakNext();
+    } catch {
+      // Ignore speech errors in prototype
+    }
+  }, []);
+
   const vibrate = useCallback((pattern = 200) => {
     if (typeof window === "undefined") return;
     if (typeof navigator === "undefined") return;
@@ -51,5 +93,5 @@ export function useAssistiveFeedback() {
     [speak, vibrate],
   );
 
-  return { speak, vibrate, notifyComingSoon, announceNavigation };
+  return { speak, speakLongText, vibrate, notifyComingSoon, announceNavigation };
 }
