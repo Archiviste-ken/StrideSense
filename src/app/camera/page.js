@@ -13,7 +13,8 @@ const FALLBACK_ANALYSIS_MESSAGE = "Unable to analyze surroundings.";
 const FOLLOW_UP_QUESTION = "Is there a person or a door nearby?";
 
 export default function CameraPage() {
-  const { speak, vibrate, notifyComingSoon } = useAssistiveFeedback();
+  const { speak, speakLongText, vibrate, notifyComingSoon } =
+    useAssistiveFeedback();
   const [message, setMessage] = useState(INITIAL_MESSAGE);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -31,20 +32,6 @@ export default function CameraPage() {
     }
 
     speak(text);
-  };
-
-  const speakSections = (text) => {
-    const sections = text.split("\n");
-
-    for (const section of sections) {
-      if (section.trim()) {
-        if (typeof window !== "undefined") {
-          window.speechSynthesis?.cancel();
-        }
-
-        speak(section.trim());
-      }
-    }
   };
 
   const stopAnalysisRequest = () => {
@@ -183,7 +170,7 @@ export default function CameraPage() {
       if (typeof window !== "undefined") {
         window.speechSynthesis?.cancel();
       }
-      speakSections(result);
+      speakLongText(result);
       vibrate(200);
     } catch (error) {
       if (error?.name === "AbortError") return;
