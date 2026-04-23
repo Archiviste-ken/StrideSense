@@ -11,8 +11,8 @@ import {
   onSnapshot,
   orderBy,
   query,
-  serverTimestamp,
   updateDoc,
+  where,
 } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
@@ -24,11 +24,25 @@ export default function HelpPage() {
     "Live assistance feature coming soon.",
   );
   const [isRequesting, setIsRequesting] = useState(false);
-  const [requestId, setRequestId] = useState(null);
+  const [docId, setDocId] = useState(null);
   const [incomingRequest, setIncomingRequest] = useState(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const helperRedirected = useRef(false);
   const blindRedirected = useRef(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || role !== "blind") return;
+
+    const saved = window.localStorage.getItem("activeRequestDocId");
+    if (
+      saved &&
+      saved !== "null" &&
+      typeof saved === "string" &&
+      saved.length > 0
+    ) {
+      setDocId(saved);
+    }
+  }, [role]);
 
   useEffect(() => {
     if (role !== "helper") {
@@ -38,6 +52,7 @@ export default function HelpPage() {
 
     const q = query(
       collection(db, "requests"),
+      where("status", "==", "waiting"),
       orderBy("createdAt", "desc"),
       limit(1),
     );
@@ -51,8 +66,11 @@ export default function HelpPage() {
       const docSnap = snapshot.docs[0];
       const data = docSnap.data();
 
-      if (data.status === "connected" && data.id) {
+      if (!data.createdAt || typeof data.createdAt !== "number") return;
+
+      if (data.status === "connected") {
         if (helperRedirected.current) return;
+        if (!data.id || typeof data.id !== "string") return;
 
         helperRedirected.current = true;
         speak("Connecting to user");
@@ -67,7 +85,8 @@ export default function HelpPage() {
 
       if (data.status === "waiting") {
         setIncomingRequest({
-          id: docSnap.id,
+          docId: docSnap.id,
+          roomId: data.id,
           ...data,
         });
         return;
@@ -80,19 +99,23 @@ export default function HelpPage() {
   }, [role, speak, vibrate]);
 
   useEffect(() => {
-    if (role !== "blind" || !requestId) return;
+    if (role !== "blind" || !docId) return;
 
-    const requestRef = doc(db, "requests", requestId);
+    const requestRef = doc(db, "requests", docId);
 
     const unsubscribe = onSnapshot(requestRef, (snap) => {
       if (!snap.exists()) return;
 
       const data = snap.data();
 
-      if (data.status === "connected" && data.id) {
+      if (data.status === "connected") {
         if (blindRedirected.current) return;
+        if (!data.id || typeof data.id !== "string") return;
 
         blindRedirected.current = true;
+        if (typeof window !== "undefined") {
+          window.localStorage.removeItem("activeRequestDocId");
+        }
         speak("Helper connected");
         vibrate([100, 50, 100]);
         setMessage("Helper connected");
@@ -101,11 +124,16 @@ export default function HelpPage() {
     });
 
     return () => unsubscribe();
-  }, [requestId, role, speak, vibrate]);
+  }, [docId, role, speak, vibrate]);
 
   const handleHelper = async () => {
     if (role !== "blind") {
       speak("Switch to assistance mode to request help");
+      return;
+    }
+
+    if (docId) {
+      speak("You already have an active request");
       return;
     }
 
@@ -123,10 +151,13 @@ export default function HelpPage() {
         id: roomId,
         status: "waiting",
         takenBy: null,
-        createdAt: serverTimestamp(),
+        createdAt: Date.now(),
       });
 
-      setRequestId(docRef.id);
+      setDocId(docRef.id);
+      if (typeof window !== "undefined") {
+        window.localStorage.setItem("activeRequestDocId", docRef.id);
+      }
       speak("Request sent. Waiting for a helper");
       vibrate(120);
       setMessage("Request sent. Waiting for a helper...");
@@ -159,7 +190,7 @@ export default function HelpPage() {
     try {
       setIsAccepting(true);
 
-      const requestRef = doc(db, "requests", incomingRequest.id);
+      const requestRef = doc(db, "requests", incomingRequest.docId);
       const latestSnap = await getDoc(requestRef);
 
       if (!latestSnap.exists()) {
@@ -246,7 +277,7 @@ export default function HelpPage() {
           <p
             className="text-xs md:text-sm text-slate-400"
             aria-live="polite"
-            data-request-id={requestId ?? undefined}
+            data-request-id={docId ?? undefined}
           >
             {message}
           </p>
