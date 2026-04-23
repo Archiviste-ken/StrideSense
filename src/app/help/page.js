@@ -19,7 +19,20 @@ import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
 
 
   function buildJitsiUrl(roomId, name = "User") {
-  return `https://meet.jit.si/${roomId}#config.prejoinPageEnabled=false&config.disableDeepLinking=true&config.startWithAudioMuted=false&config.startWithVideoMuted=false&config.requireDisplayName=false&config.enableWelcomePage=false&interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&userInfo.displayName=${encodeURIComponent(name)}`;
+  return `https://meet.jit.si/${roomId}#` +
+    `config.prejoinPageEnabled=false&` +
+    `config.disableDeepLinking=true&` +
+    `config.startWithAudioMuted=false&` +
+    `config.startWithVideoMuted=false&` +
+    `config.requireDisplayName=false&` +
+    `config.enableWelcomePage=false&` +
+    `config.enableClosePage=false&` +
+    `config.enableLobby=false&` +   // 🔥 IMPORTANT
+    `config.lobby.enable=false&` + // 🔥 DOUBLE DISABLE
+    `config.enableUserRolesBasedOnToken=false&` +
+    `config.p2p.enabled=true&` +
+    `interfaceConfig.DISABLE_JOIN_LEAVE_NOTIFICATIONS=true&` +
+    `userInfo.displayName=${encodeURIComponent(name)}`;
 }
 
 export default function HelpPage() {
@@ -114,7 +127,7 @@ export default function HelpPage() {
 
       const data = snap.data();
 
-      if (data.status === "connected") {
+      if (data.status === "connecting") {
         if (blindRedirected.current) return;
         if (!data.id || typeof data.id !== "string") return;
 
@@ -126,7 +139,9 @@ export default function HelpPage() {
         vibrate([100, 50, 100]);
         setMessage("Helper connected");
         const url = buildJitsiUrl(data.id, "Blind User");
-         window.location.href = url;
+        setTimeout(() => {
+          window.location.href = url;
+        }, 700);
       }
     });
 
@@ -214,7 +229,7 @@ export default function HelpPage() {
 
       await updateDoc(requestRef, {
         takenBy: "helper-" + Date.now(),
-        status: "connected",
+        status: "connecting",
       });
 
         const url = buildJitsiUrl(incomingRequest.roomId, "Helper");
@@ -223,7 +238,9 @@ export default function HelpPage() {
          speak("Connecting to user");
            vibrate([100, 50, 100]);
 
-          window.location.href = url;
+          setTimeout(() => {
+            window.location.href = url;
+          }, 300);
 
     
 
