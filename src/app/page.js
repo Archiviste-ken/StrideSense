@@ -36,6 +36,7 @@ export default function HomePage() {
   const lastSpokenAtRef = useRef(0);
   const simulationStartedRef = useRef(false);
   const simulationPausedRef = useRef(false);
+  const movementConfidenceRef = useRef(0);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -124,47 +125,62 @@ export default function HomePage() {
       Math.abs(acceleration.y ?? 0) +
       Math.abs(acceleration.z ?? 0);
 
-    const threshold = 18;
+    const threshold = 22;
     const isMoving = magnitude > threshold;
 
-    if (isMoving === movementStateRef.current) return;
+    if (isMoving) {
+      movementConfidenceRef.current++;
+    } else {
+      movementConfidenceRef.current = Math.max(
+        0,
+        movementConfidenceRef.current - 1,
+      );
+    }
+
+    // require consistent movement
+    const stableMoving = movementConfidenceRef.current >= 3;
+    const stableStopped = movementConfidenceRef.current === 0;
+
+    if (
+      (stableMoving && movementStateRef.current) ||
+      (stableStopped && !movementStateRef.current)
+    )
+      return;
 
     const now = Date.now();
     if (now - lastChangeRef.current < 1500) return;
     lastChangeRef.current = now;
 
-    movementStateRef.current = isMoving;
-    setIsRealMovement(isMoving);
+    if (stableMoving) {
+      movementStateRef.current = true;
+    } else if (stableStopped) {
+      movementStateRef.current = false;
+    } else {
+      return;
+    }
 
-    if (isMoving) {
+    setIsRealMovement(movementStateRef.current);
+
+    if (movementStateRef.current) {
       simulationPausedRef.current = false;
       if (!simulationStartedRef.current) {
+        vibrate([100, 50, 100]);
         simulationStartedRef.current = true;
-        speakAndRemember("Movement detected. Starting assistance.");
+        const msg = "Assistance started. Monitoring movement.";
+        voiceEngine.speak(msg, "high");
+        setLastMessage(msg);
         runSimulation(true);
       }
       setStatus(ASSISTANCE_STATUS.walking);
-      speakAndRemember("You are walking steadily");
       clearConfirmationLoop();
-      intervalRef.current = setInterval(() => {
-        if (movementStateRef.current && activeRef.current) {
-          const message = "You are still walking";
-          const now = Date.now();
-          if (
-            lastSpokenTextRef.current !== message ||
-            now - lastSpokenAtRef.current >= 5000
-          ) {
-            speakAndRemember(message);
-          }
-        }
-      }, 6000);
     } else {
+      vibrate([200, 100, 200]);
       simulationPausedRef.current = true;
       simulationStartedRef.current = false;
-      
+
       // cancel pending timers immediately
       clearAllTimers();
-      
+
       // cancel any ongoing speech
       voiceEngine.cancel();
 
@@ -216,11 +232,12 @@ export default function HomePage() {
     simulationRunIdRef.current += 1;
     const runId = simulationRunIdRef.current;
 
-    startTrackingAnimation();
     const startMessage = sensorAvailable
       ? "Assistance started. Monitoring your movement and surroundings."
       : "Assistance started. Running in simulation mode.";
-    await speakAndWait(startMessage);
+
+    // already announced via movement trigger
+
     if (!activeRef.current || simulationRunIdRef.current !== runId) return;
 
     const reachedDelay = 10800 + Math.random() * 800;
@@ -248,9 +265,8 @@ export default function HomePage() {
       {
         delay: 7800 + Math.random() * 800,
         status: ASSISTANCE_STATUS.crossing10,
-        message: `Crossing ahead in 10 steps. Turn ${
-          Math.random() > 0.5 ? "left" : "right"
-        }`,
+        message: `Crossing ahead in 10 steps. Turn ${Math.random() > 0.5 ? "left" : "right"
+          }`,
       },
       {
         delay: reachedDelay,
@@ -298,10 +314,6 @@ export default function HomePage() {
 
       // 4. Short natural delay
       await delay(600 + Math.random() * 200);
-
-      if (phase.status === ASSISTANCE_STATUS.reached) {
-        // no vibration here as it's not direct user action
-      }
     }
   };
 
@@ -344,6 +356,10 @@ export default function HomePage() {
       if (!sensorAvailable) {
         speakAndRemember("Sensor unavailable. Switching to simulation mode.");
         runSimulation(false);
+      } else {
+        const msg = "Tracking movement. Start walking.";
+        voiceEngine.speak(msg, "high");
+        setLastMessage(msg);
       }
     } else {
       simulationStartedRef.current = false;
