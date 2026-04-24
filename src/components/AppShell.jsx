@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { usePathname } from "next/navigation";
-import { useEffect, useRef } from "react";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 
 const TABS = [
@@ -15,6 +15,7 @@ const TABS = [
 export function AppShell({ children }) {
   const pathname = usePathname();
   const voiceEngine = useVoiceEngine();
+  const lastTouchTimeRef = useRef(0);
 
 
   const isCallActive =
@@ -36,15 +37,26 @@ export function AppShell({ children }) {
                 <Link
                   href={tab.href}
                   aria-label={`Go to ${tab.label} page`}
+                  onTouchStart={() => {
+                    if (pathname === tab.href) return;
+                    lastTouchTimeRef.current = Date.now();
+                    if (typeof navigator !== "undefined" && navigator.vibrate) {
+                      navigator.vibrate(50);
+                    }
+                  }}
+                  onMouseDown={() => {
+                    if (pathname === tab.href) return;
+                    // Ignore synthetic mouse event after touch
+                    if (Date.now() - lastTouchTimeRef.current < 300) return;
+                    if (typeof navigator !== "undefined" && navigator.vibrate) {
+                      navigator.vibrate(50);
+                    }
+                  }}
                   onClick={(e) => {
                     if (pathname === tab.href) return;
 
                     if (isCallActive && tab.href !== "/help") {
                       e.preventDefault();
-
-                      if (navigator.vibrate) {
-                        navigator.vibrate([100, 50, 100]);
-                      }
 
                       voiceEngine.speak(
                         "Call in progress. End call before leaving.",
@@ -54,9 +66,7 @@ export function AppShell({ children }) {
                       return;
                     }
 
-                    if (navigator.vibrate) {
-                      navigator.vibrate([80, 40, 80]);
-                    }
+                    voiceEngine.speak(`Opening ${tab.label} tab`, "high");
                   }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive

@@ -3,6 +3,22 @@
 import { useCallback, useEffect } from "react";
 import { useVoiceEngine } from "./useVoiceEngine";
 
+function safeVibrate(pattern) {
+  try {
+    if (
+      typeof navigator !== "undefined" &&
+      typeof navigator.vibrate === "function"
+    ) {
+      const success = navigator.vibrate(pattern);
+      if (success === false) {
+        console.log("Vibration blocked by browser");
+      }
+    }
+  } catch {
+    // silent fail
+  }
+}
+
 export function useAssistiveFeedback() {
   const voiceEngine = useVoiceEngine();
 
@@ -42,21 +58,12 @@ export function useAssistiveFeedback() {
   );
 
   const vibrate = useCallback((pattern = 200) => {
-    if (typeof window === "undefined") return;
-    if (typeof navigator === "undefined") return;
-    if (typeof navigator.vibrate !== "function") return;
-
-    try {
-      navigator.vibrate(pattern);
-    } catch {
-      // Ignore vibration errors in prototype
-    }
+    safeVibrate(pattern);
   }, []);
 
   const notifyComingSoon = useCallback(
     (message = "Feature coming soon") => {
       speak(message);
-      vibrate(150);
     },
     [speak, vibrate],
   );
@@ -65,7 +72,6 @@ export function useAssistiveFeedback() {
     (label) => {
       if (!label) return;
       const message = `Opening ${label} tab`;
-      vibrate(120);
       speak(message);
     },
     [speak, vibrate],

@@ -137,7 +137,6 @@ export default function HomePage() {
     if (isMoving) {
       setStatus(ASSISTANCE_STATUS.walking);
       speakAndRemember("You are walking steadily");
-      vibrate(100);
       clearConfirmationLoop();
       intervalRef.current = setInterval(() => {
         if (movementStateRef.current && activeRef.current) {
@@ -154,7 +153,6 @@ export default function HomePage() {
     } else {
       setStatus(ASSISTANCE_STATUS.stoppedWalking);
       speakAndRemember("You have stopped walking");
-      vibrate(150);
       clearConfirmationLoop();
     }
   }
@@ -203,7 +201,6 @@ export default function HomePage() {
       : "Assistance started. Running in simulation mode.";
     await speakAndWait(startMessage);
     if (!activeRef.current || simulationRunIdRef.current !== runId) return;
-    vibrate(200);
 
     const reachedDelay = 10800 + Math.random() * 800;
 
@@ -271,27 +268,14 @@ if (phase.status) {
   setStatus(phase.status);
 }
 
-// 2. Vibrate BEFORE speech (gives attention cue)
-if (phase.vibration) {
-  vibrate(phase.vibration);
-} else if (
-  phase.status === ASSISTANCE_STATUS.crossing20 ||
-  phase.status === ASSISTANCE_STATUS.crossing10 ||
-  phase.status === ASSISTANCE_STATUS.reached
-) {
-  // fallback important vibration
-  vibrate([200, 100, 200]);
-}
-
 // 3. Speak AFTER UI + vibration
-await speakAndWait(phase.message);
+    await speakAndWait(phase.message);
 
 // 4. Short natural delay
 await delay(600 + Math.random() * 200);
 
 if (phase.status === ASSISTANCE_STATUS.reached) {
-  if (navigator.vibrate) navigator.vibrate(0);
-  vibrate([300, 150, 300, 150, 300]);
+  // no vibration here as it's not direct user action
 }
 
     }
@@ -315,6 +299,7 @@ if (phase.status === ASSISTANCE_STATUS.reached) {
   }, []);
 
   const handleToggleAssistance = async () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     const nextActive = !isActive;
     activeRef.current = nextActive;
     setIsActive(nextActive);
@@ -341,18 +326,17 @@ if (phase.status === ASSISTANCE_STATUS.reached) {
       setIsRealMovement(false);
       lastChangeRef.current = 0;
       setStatus(ASSISTANCE_STATUS.idle);
-      vibrate(150);
       speakAndRemember("Assistance stopped");
     }
   };
 
   const handleRepeatInstruction = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     if (!lastMessage) {
       speak("No instruction available yet");
       return;
     }
     speak(lastMessage);
-    vibrate(100);
   };
 
   return (

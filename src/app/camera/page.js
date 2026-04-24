@@ -97,17 +97,15 @@ export default function CameraPage() {
   }, []);
 
   const handleSwitchCamera = async () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     const nextFacingMode = facingMode === "environment" ? "user" : "environment";
-    const cameraLabel = nextFacingMode === "environment" ? "back" : "front";
-
-    vibrate(120);
     speak(`Switched to ${cameraLabel} camera`);
     setFacingMode(nextFacingMode);
     await startCamera(nextFacingMode);
   };
 
   const handleTakePicture = async () => {
-    if (navigator.vibrate) navigator.vibrate(30);
+    if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
     if (!isCameraActive) {
       const cameraStarted = await startCamera();
       if (!cameraStarted) return;
@@ -141,7 +139,6 @@ export default function CameraPage() {
       setSnapshot(dataUrl);
 
       setMessage("Analyzing surroundings...");
-      vibrate([150, 80, 120]);
       await speak("Image captured");
       await speak("Analyzing scene");
       const controller = new AbortController();
@@ -162,14 +159,12 @@ export default function CameraPage() {
       }
 
       setMessage(result);
-      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
       await speak(result);
     } catch (error) {
       if (error?.name === "AbortError") return;
 
       setMessage("Network error. Please try again.");
       speak("Unable to process image");
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     } finally {
       analysisAbortRef.current = null;
       analyzingRef.current = false;
@@ -178,6 +173,7 @@ export default function CameraPage() {
   };
 
   const handleAskMore = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     const variations = [
       "No person detected nearby.",
       "No door detected in your immediate path.",
@@ -186,7 +182,6 @@ export default function CameraPage() {
     const random = variations[Math.floor(Math.random() * variations.length)];
 
     setFollowUp(FOLLOW_UP_QUESTION);
-    vibrate(120);
     speak("Checking additional details");
     setMessage(
       (previousMessage) =>
@@ -195,22 +190,22 @@ export default function CameraPage() {
   };
 
   const handleRepeatMessage = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     if (isAnalyzing) {
       speak("Analysis in progress");
       return;
     }
 
-    vibrate(100);
     speak(message);
   };
 
   const handleClosePanel = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     stopAnalysisRequest();
     stopCamera();
     setSnapshot(null);
     setFollowUp("");
     setMessage(INITIAL_MESSAGE);
-    vibrate(120);
     speak("Camera assist closed");
   };
 
@@ -222,13 +217,13 @@ export default function CameraPage() {
   }
 
   const handleTestFirebase = async () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     try {
       await testFirebase();
       setMessage("Firebase test write sent.");
       speak("Firebase test write sent");
     } catch {
       setMessage("Firebase test write failed.");
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       speak("Firebase test write failed");
     }
   };

@@ -146,7 +146,6 @@ export default function HelpPage() {
 
         helperRedirected.current = true;
         speak("Connecting to user");
-        vibrate([100, 50, 100]);
         console.log("Redirect blocked for WebRTC setup");
         return;
       }
@@ -240,7 +239,6 @@ export default function HelpPage() {
           window.localStorage.removeItem("activeRequestDocId");
         }
         speak("Helper connected");
-        vibrate([100, 50, 100]);
         setMessage("Helper connected");
         console.log("Redirect blocked for WebRTC setup");
 
@@ -312,6 +310,7 @@ export default function HelpPage() {
   };
 
   const switchCamera = async () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     try {
       const newFacing = facingMode === "user" ? "environment" : "user";
       setFacingMode(newFacing);
@@ -343,7 +342,6 @@ export default function HelpPage() {
       }
     } catch (err) {
       console.error("Switch camera error:", err);
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       speak("Something went wrong. Please try again");
     }
   };
@@ -408,7 +406,6 @@ export default function HelpPage() {
       console.log("Connection state:", state);
 
       if (state === "connected") {
-        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
         setMessage("Connected");
       }
       else if (state === "connecting") setMessage("Connecting...");
@@ -507,7 +504,6 @@ export default function HelpPage() {
   }, []);
 
   const handleHelper = async () => {
-    if (navigator.vibrate) navigator.vibrate(30);
     if (role !== "blind") {
       speak("Switch to assistance mode to request help");
       return;
@@ -537,7 +533,6 @@ export default function HelpPage() {
       }
 
       speak("Requesting assistance");
-      vibrate(200);
       setMessage("Waiting for a helper...");
 
       const roomId = Math.random().toString(36).substring(2, 10);
@@ -565,12 +560,10 @@ export default function HelpPage() {
         window.localStorage.setItem("activeRequestDocId", docRef.id);
       }
       speak("Request sent. Waiting for a helper");
-      vibrate(120);
       setMessage("Request sent. Waiting for a helper...");
     } catch (error) {
       console.error(error);
       speak("Failed to request help");
-      vibrate(150);
       setMessage("Unable to request help. Try again.");
     } finally {
       setIsRequesting(false);
@@ -578,12 +571,12 @@ export default function HelpPage() {
   };
 
   const handleEmergency = () => {
+    if (navigator.vibrate) navigator.vibrate(50);
     setMessage("Emergency contact feature coming soon.");
     notifyComingSoon("Emergency contact feature coming soon");
   };
 
   const handleAcceptRequest = async () => {
-    if (navigator.vibrate) navigator.vibrate(30);
     if (!incomingRequest || isAccepting) return;
 
     if (
@@ -650,8 +643,6 @@ export default function HelpPage() {
       });
 
       speak("Connecting to user");
-      vibrate([100, 50, 100]);
-
 
       if (helperRedirected.current) return;
       helperRedirected.current = true;
@@ -664,7 +655,6 @@ export default function HelpPage() {
     } catch (error) {
       console.error(error);
       speak("Unable to accept request");
-      vibrate(150);
       setMessage("Unable to accept request. Try again.");
     } finally {
       setIsAccepting(false);
