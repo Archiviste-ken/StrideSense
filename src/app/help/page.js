@@ -46,6 +46,15 @@ export default function HelpPage() {
   const pendingCallerCandidates = useRef([]);
   const pendingCalleeCandidates = useRef([]);
 
+ useEffect(() => {
+  if (typeof window === "undefined") return;
+
+  return () => {
+    // cleanup on unmount
+    window.__CALL_ACTIVE__ = false;
+  };
+}, []);
+
   const tryPlayAudio = () => {
     if (
       remoteAudioRef.current &&
@@ -240,6 +249,9 @@ export default function HelpPage() {
         remoteAudioRef.current.srcObject = null;
       }
 
+      if (typeof window !== "undefined") {
+        window.__CALL_ACTIVE__ = false;
+      }
       helperRedirected.current = false;
       blindRedirected.current = false;
       setDocId(null);
@@ -461,6 +473,10 @@ export default function HelpPage() {
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
 
+      if (typeof window !== "undefined") {
+        window.__CALL_ACTIVE__ = true;
+      }
+
       speak("Requesting assistance");
       vibrate(200);
       setMessage("Waiting for a helper...");
@@ -561,6 +577,10 @@ export default function HelpPage() {
       pendingCallerCandidates.current = [];
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
+
+      if (typeof window !== "undefined") {
+        window.__CALL_ACTIVE__ = true;
+      }
 
       await updateDoc(requestRef, {
         takenBy: "helper-" + Date.now(),

@@ -15,6 +15,9 @@ export function AppShell({ children }) {
   const pathname = usePathname();
   const voiceEngine = useVoiceEngine();
 
+  const isCallActive =
+    typeof window !== "undefined" && window.__CALL_ACTIVE__ === true;
+
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
       <div className="flex-1 flex flex-col">{children}</div>
@@ -31,7 +34,30 @@ export function AppShell({ children }) {
                 <Link
                   href={tab.href}
                   aria-label={`Go to ${tab.label} page`}
-                  onClick={() => voiceEngine.speak(`Opening ${tab.label} tab`, "high")}
+                  onClick={(e) => {
+                    if (pathname === tab.href) return;
+
+                    if (isCallActive && tab.href !== "/help") {
+                      e.preventDefault();
+
+                      voiceEngine.speak(
+                        "Call in progress. End call before leaving.",
+                        "high",
+                      );
+
+                      if (navigator.vibrate) {
+                        navigator.vibrate([100, 50, 100]);
+                      }
+
+                      return;
+                    }
+
+                    voiceEngine.speak(`Opening ${tab.label} tab`, "high");
+
+                    if (navigator.vibrate) {
+                      navigator.vibrate(80);
+                    }
+                  }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
                       ? "bg-sky-500 text-white"

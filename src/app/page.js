@@ -266,19 +266,34 @@ export default function HomePage() {
         continue;
       }
 
-      await speakAndWait(phase.message);
-      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+     // 1. Update UI FIRST (so user sees context)
+if (phase.status) {
+  setStatus(phase.status);
+}
 
-      if (phase.status) {
-        setStatus(phase.status);
-      }
+// 2. Vibrate BEFORE speech (gives attention cue)
+if (phase.vibration) {
+  vibrate(phase.vibration);
+} else if (
+  phase.status === ASSISTANCE_STATUS.crossing20 ||
+  phase.status === ASSISTANCE_STATUS.crossing10 ||
+  phase.status === ASSISTANCE_STATUS.reached
+) {
+  // fallback important vibration
+  vibrate([200, 100, 200]);
+}
 
-      if (phase.vibration) {
-        vibrate(phase.vibration);
-      }
+// 3. Speak AFTER UI + vibration
+await speakAndWait(phase.message);
 
-      await delay(1100 + Math.random() * 400);
-      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+// 4. Short natural delay
+await delay(600 + Math.random() * 200);
+
+if (phase.status === ASSISTANCE_STATUS.reached) {
+  if (navigator.vibrate) navigator.vibrate(0);
+  vibrate([300, 150, 300, 150, 300]);
+}
+
     }
   };
 
