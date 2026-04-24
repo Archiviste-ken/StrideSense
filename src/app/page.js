@@ -29,7 +29,6 @@ export default function HomePage() {
   const motionListenerRef = useRef(false);
   const motionHandlerRef = useRef(null);
   const movementStateRef = useRef(false);
-  const movementStateRef = useRef(false);
   const lastStartChangeRef = useRef(0);
   const lastStopChangeRef = useRef(0);
   const startTimeRef = useRef(0);
@@ -37,7 +36,6 @@ export default function HomePage() {
   const lastSpokenTextRef = useRef("");
   const lastSpokenAtRef = useRef(0);
   const simulationStartedRef = useRef(false);
-  const simulationPausedRef = useRef(false);
   const simulationPausedRef = useRef(false);
   const smoothedMagnitudeRef = useRef(0);
   const movementBufferRef = useRef([]);
