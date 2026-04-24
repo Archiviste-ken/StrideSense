@@ -36,9 +36,9 @@ export default function HomePage() {
   const lastSpokenAtRef = useRef(0);
   const simulationStartedRef = useRef(false);
   const simulationPausedRef = useRef(false);
-  const movementConfidenceRef = useRef(0);
   const lastStopCheckRef = useRef(0);
   const smoothedMagnitudeRef = useRef(0);
+  const movementBufferRef = useRef([]);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -133,22 +133,25 @@ export default function HomePage() {
 
     const threshold = 12;
     const isMoving = smoothedMagnitudeRef.current > threshold;
+    const now = performance.now();
 
-    if (isMoving) {
-      movementConfidenceRef.current = Math.min(
-        6,
-        movementConfidenceRef.current + 1,
-      );
-    } else {
-      movementConfidenceRef.current = Math.max(
-        0,
-        movementConfidenceRef.current - 1,
-      );
-    }
+    // push data
+    movementBufferRef.current.push({
+      t: now,
+      moving: isMoving,
+    });
 
-    // require consistent movement
-    const stableMoving = movementConfidenceRef.current >= 3;
-    const stableStopped = movementConfidenceRef.current <= 1;
+    // keep only last 1200ms
+    movementBufferRef.current = movementBufferRef.current.filter(
+      (entry) => now - entry.t < 1200,
+    );
+
+    const buffer = movementBufferRef.current;
+    const movingCount = buffer.filter((e) => e.moving).length;
+    const ratio = buffer.length ? movingCount / buffer.length : 0;
+
+    const stableMoving = ratio > 0.6;
+    const stableStopped = ratio < 0.2;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -156,15 +159,13 @@ export default function HomePage() {
     )
       return;
 
-    const now = performance.now();
+    if (now - lastChangeRef.current < 1500) return;
+    lastChangeRef.current = now;
 
     if (stableMoving) {
-      if (now - lastChangeRef.current < 1500) return;
-      lastChangeRef.current = now;
       movementStateRef.current = true;
-      movementConfidenceRef.current = 4;
     } else if (stableStopped) {
-      if (performance.now() - lastChangeRef.current < 2000) return;
+      if (now - lastChangeRef.current < 2000) return;
       if (now - lastStopCheckRef.current < 3500) return;
       lastStopCheckRef.current = now;
       movementStateRef.current = false;
@@ -194,7 +195,7 @@ export default function HomePage() {
       vibrate([200, 100, 200]);
       if (
         performance.now() - startTimeRef.current > 4000 &&
-        movementConfidenceRef.current === 0
+        stableStopped
       ) {
         simulationPausedRef.current = true;
       }
