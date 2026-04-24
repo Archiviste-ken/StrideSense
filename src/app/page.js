@@ -140,7 +140,7 @@ export default function HomePage() {
 
     // require consistent movement
     const stableMoving = movementConfidenceRef.current >= 3;
-    const stableStopped = movementConfidenceRef.current <= 1;
+    const stableStopped = movementConfidenceRef.current === 0;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -156,7 +156,7 @@ export default function HomePage() {
       movementStateRef.current = true;
     } else if (stableStopped) {
       if (performance.now() - lastChangeRef.current < 2000) return;
-      if (now - lastStopCheckRef.current < 2500) return;
+      if (now - lastStopCheckRef.current < 3500) return;
       lastStopCheckRef.current = now;
       movementStateRef.current = false;
     } else {
@@ -184,7 +184,7 @@ export default function HomePage() {
     } else {
       vibrate([200, 100, 200]);
       if (
-        performance.now() - startTimeRef.current > 3000 &&
+        performance.now() - startTimeRef.current > 4000 &&
         movementConfidenceRef.current === 0
       ) {
         simulationPausedRef.current = true;
