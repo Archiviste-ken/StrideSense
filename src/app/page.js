@@ -192,7 +192,7 @@ export default function HomePage() {
     } else {
       vibrate([200, 100, 200]);
       if (
-        performance.now() - startTimeRef.current > 4000 &&
+        performance.now() - lastStartChangeRef.current > 4000 &&
         stableStopped
       ) {
         simulationPausedRef.current = true;
