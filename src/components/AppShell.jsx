@@ -35,7 +35,7 @@ export function AppShell({ children }) {
                 <Link
                   href="#" // prevent automatic routing
                   aria-label={`Go to ${tab.label} page`}
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     if (pathname === tab.href) return;
 
                     if (isCallActive && tab.href !== "/help") {
@@ -62,10 +62,8 @@ export function AppShell({ children }) {
                       navigator.vibrate([80, 40, 80]);
                     }
 
-                    // Navigate AFTER short delay
-                    setTimeout(() => {
-                      router.push(tab.href);
-                    }, 120);
+                    await Promise.resolve();
+                    router.push(tab.href);
                   }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
