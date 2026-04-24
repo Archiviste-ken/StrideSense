@@ -34,6 +34,8 @@ export default function HomePage() {
   const simulationRunIdRef = useRef(0);
   const lastSpokenTextRef = useRef("");
   const lastSpokenAtRef = useRef(0);
+  const simulationStartedRef = useRef(false);
+  const simulationPausedRef = useRef(false);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -135,6 +137,12 @@ export default function HomePage() {
     setIsRealMovement(isMoving);
 
     if (isMoving) {
+      simulationPausedRef.current = false;
+      if (!simulationStartedRef.current) {
+        simulationStartedRef.current = true;
+        speakAndRemember("Movement detected. Starting assistance.");
+        runSimulation(true);
+      }
       setStatus(ASSISTANCE_STATUS.walking);
       speakAndRemember("You are walking steadily");
       clearConfirmationLoop();
@@ -151,8 +159,21 @@ export default function HomePage() {
         }
       }, 6000);
     } else {
+      simulationPausedRef.current = true;
+      simulationStartedRef.current = false;
+      
+      // cancel pending timers immediately
+      clearAllTimers();
+      
+      // cancel any ongoing speech
+      voiceEngine.cancel();
+
       setStatus(ASSISTANCE_STATUS.stoppedWalking);
-      speakAndRemember("You have stopped walking");
+
+      // speak AFTER cancel using high priority
+      voiceEngine.speak("You have stopped walking", "high");
+
+      setLastMessage("You have stopped walking");
       clearConfirmationLoop();
     }
   }
@@ -249,6 +270,9 @@ export default function HomePage() {
 
     let previousDelay = 0;
     for (const phase of phases) {
+      if (simulationPausedRef.current) {
+        return;
+      }
       const waitMs = Math.max(0, phase.delay - previousDelay);
       previousDelay = phase.delay;
 
@@ -319,9 +343,11 @@ export default function HomePage() {
       const sensorAvailable = await startMotionListener();
       if (!sensorAvailable) {
         speakAndRemember("Sensor unavailable. Switching to simulation mode.");
+        runSimulation(false);
       }
-      runSimulation(sensorAvailable);
     } else {
+      simulationStartedRef.current = false;
+      simulationPausedRef.current = false;
       startTimeRef.current = 0;
       stopMotionListener();
       clearAllTimers();
