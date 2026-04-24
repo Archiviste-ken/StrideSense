@@ -40,29 +40,38 @@ export function AppShell({ children }) {
                     if (isCallActive && tab.href !== "/help") {
                       e.preventDefault();
 
+                      if (navigator.vibrate) {
+                        navigator.vibrate([100, 50, 100]);
+                      }
+
                       voiceEngine.speak(
                         "Call in progress. End call before leaving.",
                         "high",
                       );
 
-                      if (navigator.vibrate) {
-                        navigator.vibrate([100, 50, 100]);
-                      }
-
                       return;
                     }
+
+                    // Safe cancel (only if needed)
+                    if (
+                      typeof window !== "undefined" &&
+                      window.speechSynthesis
+                    ) {
+                      const synth = window.speechSynthesis;
+
+                      if (synth.speaking || synth.pending) {
+                        try {
+                          synth.cancel();
+                        } catch {}
+                      }
+                    }
+
+                    // Speak immediately (NO timeout)
+                    voiceEngine.speak(`Opening ${tab.label} tab`, "high");
 
                     if (navigator.vibrate) {
                       navigator.vibrate([80, 40, 80]);
                     }
-
-                    if (typeof window !== "undefined" && window.speechSynthesis) {
-                      window.speechSynthesis.cancel();
-                    }
-
-                    setTimeout(() => {
-                      voiceEngine.speak(`Opening ${tab.label} tab`, "high");
-                    }, 30);
                   }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive

@@ -263,6 +263,7 @@ export default function HelpPage() {
       audioReadyRef.current = false;
       userInteractedRef.current = false;
 
+      speak("Call ended");
       setMessage("Call ended");
     } catch (err) {
       console.error("End call error:", err);
@@ -469,6 +470,7 @@ export default function HelpPage() {
       setIsRequesting(true);
       await startLocalStream();
 
+      speak("Connecting to helper");
       const pc = createPeerConnection();
 
 

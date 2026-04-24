@@ -82,6 +82,7 @@ export default function CameraPage() {
       }
 
       setIsCameraActive(true);
+      speak("Camera opened");
       setMessage("Camera preview active. Ready to describe your surroundings.");
       return true;
     } catch {
@@ -123,6 +124,7 @@ export default function CameraPage() {
     setIsAnalyzing(true);
 
     try {
+      speak("Capturing image");
       const video = videoRef.current;
       if (!video) {
         setMessage("Camera preview is not available.");
@@ -147,6 +149,7 @@ export default function CameraPage() {
       vibrate([150, 80, 120]);
       speakWithoutOverlap("Image captured. Analyzing your surroundings.");
 
+      speak("Analyzing scene");
       const controller = new AbortController();
       analysisAbortRef.current = controller;
       const response = await fetch("/api/analyze-image", {
