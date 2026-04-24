@@ -163,7 +163,7 @@ export default function CameraPage() {
 
       setMessage(result);
       vibrate([100, 50, 100]);
-      speak(result);
+      await speak(result);
       vibrate(200);
     } catch (error) {
       if (error?.name === "AbortError") return;
