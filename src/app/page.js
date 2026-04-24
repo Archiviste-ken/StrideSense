@@ -142,13 +142,13 @@ export default function HomePage() {
     } else {
       movementConfidenceRef.current = Math.max(
         0,
-        movementConfidenceRef.current - 2,
+        movementConfidenceRef.current - 1,
       );
     }
 
     // require consistent movement
     const stableMoving = movementConfidenceRef.current >= 3;
-    const stableStopped = movementConfidenceRef.current === 0;
+    const stableStopped = movementConfidenceRef.current <= 1;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -162,6 +162,7 @@ export default function HomePage() {
       if (now - lastChangeRef.current < 1500) return;
       lastChangeRef.current = now;
       movementStateRef.current = true;
+      movementConfidenceRef.current = 4;
     } else if (stableStopped) {
       if (performance.now() - lastChangeRef.current < 2000) return;
       if (now - lastStopCheckRef.current < 3500) return;
