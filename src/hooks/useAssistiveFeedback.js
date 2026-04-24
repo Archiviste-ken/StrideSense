@@ -1,67 +1,49 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
+import { useVoiceEngine } from "./useVoiceEngine";
 
 export function useAssistiveFeedback() {
-  const speak = useCallback((message) => {
-    if (typeof window === "undefined") return;
-    if (!message) return;
+  const voiceEngine = useVoiceEngine();
 
-    const synth = window.speechSynthesis;
-    if (!synth) return;
+  useEffect(() => {
+    return () => {
+      voiceEngine.cancel();
+    };
+  }, [voiceEngine]);
 
-    try {
-      synth.cancel();
-      const utterance = new SpeechSynthesisUtterance(message);
-      utterance.rate = 1;
-      utterance.pitch = 1;
-      synth.speak(utterance);
-    } catch {
-      // Ignore speech errors in prototype
-    }
-  }, []);
+  const speak = useCallback(
+    (message) => {
+      voiceEngine.speak(message);
+    },
+    [voiceEngine],
+  );
 
-  const speakLongText = useCallback((text) => {
-    if (typeof window === "undefined") return;
-    if (!text) return;
+  const speakLongText = useCallback(
+    async (text) => {
+      if (!text) return;
 
-    const synth = window.speechSynthesis;
-    if (!synth) return;
+      try {
+        voiceEngine.cancel();
 
-    try {
-      synth.cancel();
+        const sentences = text
+          .replace(/\n/g, " ")
+          .split(/(?<=[.?!])\s+/)
+          .map((sentence) => sentence.trim())
+          .filter(Boolean);
 
-      const sentences = text.replace(/\n/g, " ").split(/(?<=[.?!])\s+/);
-      let index = 0;
-
-      function speakNext() {
-        if (index >= sentences.length) return;
-
-        const sentence = sentences[index]?.trim();
-        if (!sentence) {
-          index += 1;
-          setTimeout(speakNext, 400);
-          return;
+        for (const sentence of sentences) {
+          // Queue each sentence to avoid overlap while preserving ordering.
+          // Returning/awaiting keeps the chain predictable without touching callers.
+          // eslint-disable-next-line no-await-in-loop
+          await voiceEngine.speak(sentence);
         }
-
-        const utterance = new SpeechSynthesisUtterance(sentence);
-        utterance.rate = 0.85;
-        utterance.pitch = 1;
-        utterance.volume = 1;
-
-        utterance.onend = () => {
-          index += 1;
-          setTimeout(speakNext, 400);
-        };
-
-        synth.speak(utterance);
+      } catch {
+        // Ignore speech errors in prototype
       }
-
-      speakNext();
-    } catch {
-      // Ignore speech errors in prototype
-    }
-  }, []);
+    },
+    [voiceEngine],
+  );
 
   const vibrate = useCallback((pattern = 200) => {
     if (typeof window === "undefined") return;
