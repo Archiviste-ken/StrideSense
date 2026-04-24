@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useRef } from "react";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 
 const TABS = [
@@ -14,6 +15,7 @@ const TABS = [
 export function AppShell({ children }) {
   const pathname = usePathname();
   const voiceEngine = useVoiceEngine();
+
 
   const isCallActive =
     typeof window !== "undefined" && window.__CALL_ACTIVE__ === true;
@@ -51,9 +53,6 @@ export function AppShell({ children }) {
 
                       return;
                     }
-
-                    // SPEAK ONLY — DO NOT CONTROL NAVIGATION
-                    voiceEngine.speak(`Opening ${tab.label} tab`, "high").catch(() => {});
 
                     if (navigator.vibrate) {
                       navigator.vibrate([80, 40, 80]);

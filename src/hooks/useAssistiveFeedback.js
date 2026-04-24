@@ -6,11 +6,7 @@ import { useVoiceEngine } from "./useVoiceEngine";
 export function useAssistiveFeedback() {
   const voiceEngine = useVoiceEngine();
 
-  useEffect(() => {
-    return () => {
-      voiceEngine.cancel();
-    };
-  }, [voiceEngine]);
+
 
   const speak = useCallback(
     (message) => {
