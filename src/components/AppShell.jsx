@@ -52,21 +52,6 @@ export function AppShell({ children }) {
                       return;
                     }
 
-                    // Safe cancel (only if needed)
-                    if (
-                      typeof window !== "undefined" &&
-                      window.speechSynthesis
-                    ) {
-                      const synth = window.speechSynthesis;
-
-                      if (synth.speaking || synth.pending) {
-                        try {
-                          synth.cancel();
-                        } catch {}
-                      }
-                    }
-
-                    // Speak immediately (NO timeout)
                     voiceEngine.speak(`Opening ${tab.label} tab`, "high");
 
                     if (navigator.vibrate) {

@@ -147,8 +147,7 @@ export default function CameraPage() {
 
       setMessage("Analyzing surroundings...");
       vibrate([150, 80, 120]);
-      speakWithoutOverlap("Image captured. Analyzing your surroundings.");
-
+      await speak("Image captured");
       speak("Analyzing scene");
       const controller = new AbortController();
       analysisAbortRef.current = controller;
@@ -163,17 +162,8 @@ export default function CameraPage() {
       if (analysisAbortRef.current !== controller) return;
 
       setMessage(result);
-      await new Promise((resolve) => {
-        setTimeout(resolve, 150);
-      });
       vibrate([100, 50, 100]);
-      await new Promise((resolve) => {
-        setTimeout(resolve, 250);
-      });
-      if (typeof window !== "undefined") {
-        window.speechSynthesis?.cancel();
-      }
-      speakLongText(result);
+      speak(result);
       vibrate(200);
     } catch (error) {
       if (error?.name === "AbortError") return;
