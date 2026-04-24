@@ -126,7 +126,7 @@ export default function HomePage() {
       Math.abs(acceleration.y ?? 0) +
       Math.abs(acceleration.z ?? 0);
 
-    const threshold = 26;
+    const threshold = 18;
     const isMoving = magnitude > threshold;
 
     if (isMoving) {
@@ -139,8 +139,8 @@ export default function HomePage() {
     }
 
     // require consistent movement
-    const stableMoving = movementConfidenceRef.current >= 5;
-    const stableStopped = movementConfidenceRef.current === 0;
+    const stableMoving = movementConfidenceRef.current >= 3;
+    const stableStopped = movementConfidenceRef.current <= 1;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -155,6 +155,7 @@ export default function HomePage() {
       lastChangeRef.current = now;
       movementStateRef.current = true;
     } else if (stableStopped) {
+      if (performance.now() - lastChangeRef.current < 2000) return;
       if (now - lastStopCheckRef.current < 2500) return;
       lastStopCheckRef.current = now;
       movementStateRef.current = false;
