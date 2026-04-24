@@ -218,13 +218,11 @@ export default function HomePage() {
       {
         delay: 4600 + Math.random() * 800,
         message: "Attention",
-        vibration: [100, 50, 100],
       },
       {
         delay: 4800 + Math.random() * 800,
         status: ASSISTANCE_STATUS.crossing20,
         message: "Crossing ahead in 20 steps",
-        vibration: [200, 100, 200, 100, 200],
       },
       {
         delay: 7800 + Math.random() * 800,
@@ -301,17 +299,13 @@ export default function HomePage() {
   }, []);
 
   const handleToggleAssistance = async () => {
-    vibrate([160, 80, 160]);
-
     const nextActive = !isActive;
 
-    
-  // 🔥 choose ONE pattern based on action
-  if (nextActive) {
-    vibrate([160, 80, 160]); // start
-  } else {
-    vibrate([80, 40, 80]); // stop
-  }
+    if (nextActive) {
+      vibrate([180, 100, 180]); // stronger start
+    } else {
+      vibrate([120, 60, 120]); // clear stop
+    }
 
     activeRef.current = nextActive;
     setIsActive(nextActive);
