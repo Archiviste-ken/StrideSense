@@ -139,7 +139,7 @@ export default function HomePage() {
 
     // require consistent movement
     const stableMoving = movementConfidenceRef.current >= 3;
-    const stableStopped = movementConfidenceRef.current === 0;
+    const stableStopped = movementConfidenceRef.current <= 1;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -164,22 +164,28 @@ export default function HomePage() {
     if (movementStateRef.current) {
       simulationPausedRef.current = false;
       if (!simulationStartedRef.current) {
+        clearAllTimers();
         vibrate([100, 50, 100]);
+
         simulationStartedRef.current = true;
+
         const msg = "Assistance started. Monitoring movement.";
         voiceEngine.speak(msg, "high");
         setLastMessage(msg);
+
         runSimulation(true);
       }
       setStatus(ASSISTANCE_STATUS.walking);
       clearConfirmationLoop();
     } else {
       vibrate([200, 100, 200]);
-      simulationPausedRef.current = true;
+      if (
+        Date.now() - startTimeRef.current > 3000 &&
+        movementConfidenceRef.current === 0
+      ) {
+        simulationPausedRef.current = true;
+      }
       simulationStartedRef.current = false;
-
-      // cancel pending timers immediately
-      clearAllTimers();
 
       // cancel any ongoing speech
       voiceEngine.cancel();
@@ -238,7 +244,10 @@ export default function HomePage() {
 
     // already announced via movement trigger
 
-    if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+    if (!activeRef.current || simulationRunIdRef.current !== runId) {
+      simulationStartedRef.current = false;
+      return;
+    }
 
     const reachedDelay = 10800 + Math.random() * 800;
 
@@ -287,13 +296,17 @@ export default function HomePage() {
     let previousDelay = 0;
     for (const phase of phases) {
       if (simulationPausedRef.current) {
+        simulationStartedRef.current = false;
         return;
       }
       const waitMs = Math.max(0, phase.delay - previousDelay);
       previousDelay = phase.delay;
 
       await delay(waitMs);
-      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+      if (!activeRef.current || simulationRunIdRef.current !== runId) {
+        simulationStartedRef.current = false;
+        return;
+      }
 
       clearTrackingAnimation();
 
@@ -310,11 +323,18 @@ export default function HomePage() {
       }
 
       // 3. Speak AFTER UI + vibration
+      const start = Date.now();
       await speakAndWait(phase.message);
+      const elapsed = Date.now() - start;
+      const remaining = Math.max(0, 1000 - elapsed);
+      if (remaining > 0) {
+        await delay(remaining);
+      }
 
       // 4. Short natural delay
       await delay(600 + Math.random() * 200);
     }
+    simulationStartedRef.current = false;
   };
 
   useEffect(() => {
