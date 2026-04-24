@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../hooks/useAssistiveFeedback";
+import { useVoiceEngine } from "../hooks/useVoiceEngine";
 
 const ASSISTANCE_STATUS = {
   idle: "Idle",
@@ -20,6 +21,7 @@ export default function HomePage() {
   const [, setIsRealMovement] = useState(false);
   const [, setHasSensorPermission] = useState(false);
   const { speak, vibrate } = useAssistiveFeedback();
+  const voiceEngine = useVoiceEngine();
   const timersRef = useRef([]);
   const intervalRef = useRef(null);
   const trackingIntervalRef = useRef(null);
@@ -29,6 +31,9 @@ export default function HomePage() {
   const movementStateRef = useRef(false);
   const lastChangeRef = useRef(0);
   const startTimeRef = useRef(0);
+  const simulationRunIdRef = useRef(0);
+  const lastSpokenTextRef = useRef("");
+  const lastSpokenAtRef = useRef(0);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -52,8 +57,24 @@ export default function HomePage() {
   const speakAndRemember = (message) => {
     if (!message) return;
     setLastMessage(message);
+    lastSpokenTextRef.current = message;
+    lastSpokenAtRef.current = Date.now();
     speak(message);
   };
+
+  const delay = (ms) =>
+    new Promise((resolve) => {
+      const timerId = setTimeout(resolve, ms);
+      timersRef.current.push(timerId);
+    });
+
+  async function speakAndWait(text) {
+    if (!text) return;
+    setLastMessage(text);
+    lastSpokenTextRef.current = text;
+    lastSpokenAtRef.current = Date.now();
+    await voiceEngine.speak(text, "normal");
+  }
 
   const startTrackingAnimation = () => {
     const trackingMessages = [
@@ -120,7 +141,14 @@ export default function HomePage() {
       clearConfirmationLoop();
       intervalRef.current = setInterval(() => {
         if (movementStateRef.current && activeRef.current) {
-          speakAndRemember("You are still walking");
+          const message = "You are still walking";
+          const now = Date.now();
+          if (
+            lastSpokenTextRef.current !== message ||
+            now - lastSpokenAtRef.current >= 5000
+          ) {
+            speakAndRemember(message);
+          }
         }
       }, 6000);
     } else {
@@ -164,14 +192,17 @@ export default function HomePage() {
     }
   };
 
-  const runSimulation = (sensorAvailable) => {
+  const runSimulation = async (sensorAvailable) => {
     clearAllTimers();
+    simulationRunIdRef.current += 1;
+    const runId = simulationRunIdRef.current;
 
     startTrackingAnimation();
     const startMessage = sensorAvailable
       ? "Assistance started. Monitoring your movement and surroundings."
       : "Assistance started. Running in simulation mode.";
-    speakAndRemember(startMessage);
+    await speakAndWait(startMessage);
+    if (!activeRef.current || simulationRunIdRef.current !== runId) return;
     vibrate(200);
 
     const reachedDelay = 10800 + Math.random() * 800;
@@ -221,27 +252,34 @@ export default function HomePage() {
       },
     ];
 
-    phases.forEach((phase) => {
-      const timerId = setTimeout(() => {
-        if (!activeRef.current) return;
+    let previousDelay = 0;
+    for (const phase of phases) {
+      const waitMs = Math.max(0, phase.delay - previousDelay);
+      previousDelay = phase.delay;
 
-        clearTrackingAnimation();
+      await delay(waitMs);
+      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
 
-        if (movementStateRef.current && phase.status === ASSISTANCE_STATUS.walking) {
-          return;
-        }
+      clearTrackingAnimation();
 
-        if (phase.status) {
-          setStatus(phase.status);
-        }
-        speakAndRemember(phase.message);
-        if (phase.vibration) {
-          vibrate(phase.vibration);
-        }
-      }, phase.delay);
+      if (movementStateRef.current && phase.status === ASSISTANCE_STATUS.walking) {
+        continue;
+      }
 
-      timersRef.current.push(timerId);
-    });
+      await speakAndWait(phase.message);
+      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+
+      if (phase.status) {
+        setStatus(phase.status);
+      }
+
+      if (phase.vibration) {
+        vibrate(phase.vibration);
+      }
+
+      await delay(1100 + Math.random() * 400);
+      if (!activeRef.current || simulationRunIdRef.current !== runId) return;
+    }
   };
 
   useEffect(() => {
@@ -281,6 +319,7 @@ export default function HomePage() {
       startTimeRef.current = 0;
       stopMotionListener();
       clearAllTimers();
+      simulationRunIdRef.current += 1;
       clearConfirmationLoop();
       clearTrackingAnimation();
       movementStateRef.current = false;

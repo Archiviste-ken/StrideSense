@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useAssistiveFeedback } from "../hooks/useAssistiveFeedback";
+import { useVoiceEngine } from "../hooks/useVoiceEngine";
 
 const TABS = [
   { href: "/", label: "Home" },
@@ -13,7 +13,7 @@ const TABS = [
 
 export function AppShell({ children }) {
   const pathname = usePathname();
-  const { announceNavigation } = useAssistiveFeedback();
+  const voiceEngine = useVoiceEngine();
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
@@ -31,7 +31,7 @@ export function AppShell({ children }) {
                 <Link
                   href={tab.href}
                   aria-label={`Go to ${tab.label} page`}
-                  onClick={() => announceNavigation(tab.label)}
+                  onClick={() => voiceEngine.speak(`Opening ${tab.label} tab`, "high")}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
                       ? "bg-sky-500 text-white"
