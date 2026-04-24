@@ -37,6 +37,7 @@ export default function HomePage() {
   const simulationStartedRef = useRef(false);
   const simulationPausedRef = useRef(false);
   const movementConfidenceRef = useRef(0);
+  const lastStopCheckRef = useRef(0);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -115,7 +116,7 @@ export default function HomePage() {
 
   function handleDeviceMotion(event) {
     if (!activeRef.current) return;
-    if (Date.now() - startTimeRef.current < 2000) return;
+    if (performance.now() - startTimeRef.current < 2000) return;
 
     const acceleration = event.accelerationIncludingGravity;
     if (!acceleration) return;
@@ -125,7 +126,7 @@ export default function HomePage() {
       Math.abs(acceleration.y ?? 0) +
       Math.abs(acceleration.z ?? 0);
 
-    const threshold = 22;
+    const threshold = 26;
     const isMoving = magnitude > threshold;
 
     if (isMoving) {
@@ -138,8 +139,8 @@ export default function HomePage() {
     }
 
     // require consistent movement
-    const stableMoving = movementConfidenceRef.current >= 3;
-    const stableStopped = movementConfidenceRef.current <= 1;
+    const stableMoving = movementConfidenceRef.current >= 5;
+    const stableStopped = movementConfidenceRef.current === 0;
 
     if (
       (stableMoving && movementStateRef.current) ||
@@ -147,13 +148,15 @@ export default function HomePage() {
     )
       return;
 
-    const now = Date.now();
-    if (now - lastChangeRef.current < 1500) return;
-    lastChangeRef.current = now;
+    const now = performance.now();
 
     if (stableMoving) {
+      if (now - lastChangeRef.current < 1500) return;
+      lastChangeRef.current = now;
       movementStateRef.current = true;
     } else if (stableStopped) {
+      if (now - lastStopCheckRef.current < 2500) return;
+      lastStopCheckRef.current = now;
       movementStateRef.current = false;
     } else {
       return;
@@ -180,7 +183,7 @@ export default function HomePage() {
     } else {
       vibrate([200, 100, 200]);
       if (
-        Date.now() - startTimeRef.current > 3000 &&
+        performance.now() - startTimeRef.current > 3000 &&
         movementConfidenceRef.current === 0
       ) {
         simulationPausedRef.current = true;
@@ -323,9 +326,9 @@ export default function HomePage() {
       }
 
       // 3. Speak AFTER UI + vibration
-      const start = Date.now();
+      const start = performance.now();
       await speakAndWait(phase.message);
-      const elapsed = Date.now() - start;
+      const elapsed = performance.now() - start;
       const remaining = Math.max(0, 1000 - elapsed);
       if (remaining > 0) {
         await delay(remaining);
@@ -367,7 +370,7 @@ export default function HomePage() {
     setIsActive(nextActive);
 
     if (nextActive) {
-      startTimeRef.current = Date.now();
+      startTimeRef.current = performance.now();
       movementStateRef.current = false;
       setIsRealMovement(false);
       lastChangeRef.current = 0;
