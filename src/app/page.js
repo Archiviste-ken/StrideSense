@@ -14,6 +14,12 @@ const ASSISTANCE_STATUS = {
   stoppedWalking: "You have stopped walking",
 };
 
+const safeVibrate = (pattern) => {
+  if (typeof navigator !== "undefined" && navigator.vibrate) {
+    navigator.vibrate(pattern);
+  }
+};
+
 export default function HomePage() {
   const [isActive, setIsActive] = useState(false);
   const [status, setStatus] = useState(ASSISTANCE_STATUS.idle);
@@ -391,9 +397,10 @@ export default function HomePage() {
     const nextActive = !isActive;
 
     if (nextActive) {
-      vibrate([180, 100, 180]); // stronger start
+      // STRONG IMMEDIATE HAPTIC (guaranteed by browser)
+      safeVibrate([200, 100, 200]);
     } else {
-      vibrate([120, 60, 120]); // clear stop
+      safeVibrate([120, 60, 120]); // clear stop
     }
 
     activeRef.current = nextActive;
@@ -412,6 +419,7 @@ export default function HomePage() {
         runSimulation(false);
       } else {
         const msg = "Tracking movement. Start walking.";
+        safeVibrate(60);
         voiceEngine.speak(msg, "high");
         setLastMessage(msg);
       }
