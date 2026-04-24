@@ -29,14 +29,16 @@ export default function HomePage() {
   const motionListenerRef = useRef(false);
   const motionHandlerRef = useRef(null);
   const movementStateRef = useRef(false);
-  const lastChangeRef = useRef(0);
+  const movementStateRef = useRef(false);
+  const lastStartChangeRef = useRef(0);
+  const lastStopChangeRef = useRef(0);
   const startTimeRef = useRef(0);
   const simulationRunIdRef = useRef(0);
   const lastSpokenTextRef = useRef("");
   const lastSpokenAtRef = useRef(0);
   const simulationStartedRef = useRef(false);
   const simulationPausedRef = useRef(false);
-  const lastStopCheckRef = useRef(0);
+  const simulationPausedRef = useRef(false);
   const smoothedMagnitudeRef = useRef(0);
   const movementBufferRef = useRef([]);
 
@@ -159,15 +161,13 @@ export default function HomePage() {
     )
       return;
 
-    if (now - lastChangeRef.current < 1500) return;
-    lastChangeRef.current = now;
-
     if (stableMoving) {
+      if (now - lastStartChangeRef.current < 1500) return;
+      lastStartChangeRef.current = now;
       movementStateRef.current = true;
     } else if (stableStopped) {
-      if (now - lastChangeRef.current < 2000) return;
-      if (now - lastStopCheckRef.current < 3500) return;
-      lastStopCheckRef.current = now;
+      if (now - lastStopChangeRef.current < 3500) return;
+      lastStopChangeRef.current = now;
       movementStateRef.current = false;
     } else {
       return;
@@ -384,7 +384,8 @@ export default function HomePage() {
       startTimeRef.current = performance.now();
       movementStateRef.current = false;
       setIsRealMovement(false);
-      lastChangeRef.current = 0;
+      lastStartChangeRef.current = 0;
+      lastStopChangeRef.current = 0;
 
       const sensorAvailable = await startMotionListener();
       if (!sensorAvailable) {
