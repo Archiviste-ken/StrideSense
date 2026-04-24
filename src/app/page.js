@@ -38,6 +38,7 @@ export default function HomePage() {
   const simulationPausedRef = useRef(false);
   const movementConfidenceRef = useRef(0);
   const lastStopCheckRef = useRef(0);
+  const smoothedMagnitudeRef = useRef(0);
 
   const clearAllTimers = () => {
     timersRef.current.forEach((timerId) => clearTimeout(timerId));
@@ -121,20 +122,27 @@ export default function HomePage() {
     const acceleration = event.accelerationIncludingGravity;
     if (!acceleration) return;
 
-    const magnitude =
+    const rawMagnitude =
       Math.abs(acceleration.x ?? 0) +
       Math.abs(acceleration.y ?? 0) +
       Math.abs(acceleration.z ?? 0);
 
-    const threshold = 18;
-    const isMoving = magnitude > threshold;
+    // exponential smoothing
+    smoothedMagnitudeRef.current =
+      smoothedMagnitudeRef.current * 0.8 + rawMagnitude * 0.2;
+
+    const threshold = 12;
+    const isMoving = smoothedMagnitudeRef.current > threshold;
 
     if (isMoving) {
-      movementConfidenceRef.current++;
+      movementConfidenceRef.current = Math.min(
+        6,
+        movementConfidenceRef.current + 1,
+      );
     } else {
       movementConfidenceRef.current = Math.max(
         0,
-        movementConfidenceRef.current - 1,
+        movementConfidenceRef.current - 2,
       );
     }
 
