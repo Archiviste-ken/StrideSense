@@ -259,25 +259,27 @@ export default function HomePage() {
 
       clearTrackingAnimation();
 
-      if (movementStateRef.current && phase.status === ASSISTANCE_STATUS.walking) {
+      if (
+        movementStateRef.current &&
+        phase.status === ASSISTANCE_STATUS.walking
+      ) {
         continue;
       }
 
-     // 1. Update UI FIRST (so user sees context)
-if (phase.status) {
-  setStatus(phase.status);
-}
+      // 1. Update UI FIRST (so user sees context)
+      if (phase.status) {
+        setStatus(phase.status);
+      }
 
-// 3. Speak AFTER UI + vibration
-    await speakAndWait(phase.message);
+      // 3. Speak AFTER UI + vibration
+      await speakAndWait(phase.message);
 
-// 4. Short natural delay
-await delay(600 + Math.random() * 200);
+      // 4. Short natural delay
+      await delay(600 + Math.random() * 200);
 
-if (phase.status === ASSISTANCE_STATUS.reached) {
-  // no vibration here as it's not direct user action
-}
-
+      if (phase.status === ASSISTANCE_STATUS.reached) {
+        // no vibration here as it's not direct user action
+      }
     }
   };
 
@@ -299,8 +301,18 @@ if (phase.status === ASSISTANCE_STATUS.reached) {
   }, []);
 
   const handleToggleAssistance = async () => {
-    if (navigator.vibrate) navigator.vibrate(50);
+    vibrate([160, 80, 160]);
+
     const nextActive = !isActive;
+
+    
+  // 🔥 choose ONE pattern based on action
+  if (nextActive) {
+    vibrate([160, 80, 160]); // start
+  } else {
+    vibrate([80, 40, 80]); // stop
+  }
+
     activeRef.current = nextActive;
     setIsActive(nextActive);
 
@@ -331,7 +343,7 @@ if (phase.status === ASSISTANCE_STATUS.reached) {
   };
 
   const handleRepeatInstruction = () => {
-    if (navigator.vibrate) navigator.vibrate(50);
+    vibrate(60);
     if (!lastMessage) {
       speak("No instruction available yet");
       return;
@@ -386,9 +398,16 @@ if (phase.status === ASSISTANCE_STATUS.reached) {
           </p>
 
           <ul className="space-y-1 text-xs md:text-sm text-slate-400">
-            <li>Demo-only walking simulation with speech and vibration cues.</li>
-            <li>Real movement detection takes priority when sensor access is available.</li>
-            <li>Use the repeat button to replay the last spoken instruction.</li>
+            <li>
+              Demo-only walking simulation with speech and vibration cues.
+            </li>
+            <li>
+              Real movement detection takes priority when sensor access is
+              available.
+            </li>
+            <li>
+              Use the repeat button to replay the last spoken instruction.
+            </li>
           </ul>
         </div>
       </section>
