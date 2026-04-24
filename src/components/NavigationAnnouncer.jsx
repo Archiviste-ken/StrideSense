@@ -8,6 +8,7 @@ export default function NavigationAnnouncer() {
   const pathname = usePathname();
   const voiceEngine = useVoiceEngine();
   const lastPathRef = useRef("");
+  const lastSpokenAtRef = useRef(0);
 
   useEffect(() => {
     if (!pathname) return;
@@ -23,6 +24,10 @@ export default function NavigationAnnouncer() {
     else if (pathname === "/profile") label = "Profile";
 
     if (!label) return;
+
+    const now = Date.now();
+    if (now - lastSpokenAtRef.current < 250) return;
+    lastSpokenAtRef.current = now;
 
     // Run AFTER render settles (not blocking navigation)
     requestAnimationFrame(() => {
