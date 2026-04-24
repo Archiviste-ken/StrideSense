@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useVoiceEngine } from "../hooks/useVoiceEngine";
 
 const TABS = [
@@ -13,7 +13,6 @@ const TABS = [
 
 export function AppShell({ children }) {
   const pathname = usePathname();
-  const router = useRouter();
   const voiceEngine = useVoiceEngine();
 
   const isCallActive =
@@ -33,9 +32,9 @@ export function AppShell({ children }) {
             return (
               <li key={tab.href} className="flex-1">
                 <Link
-                  href="#" // prevent automatic routing
+                  href={tab.href}
                   aria-label={`Go to ${tab.label} page`}
-                  onClick={async (e) => {
+                  onClick={(e) => {
                     if (pathname === tab.href) return;
 
                     if (isCallActive && tab.href !== "/help") {
@@ -53,17 +52,12 @@ export function AppShell({ children }) {
                       return;
                     }
 
-                    e.preventDefault(); // STOP instant navigation
-
-                    // Speak FIRST
-                    voiceEngine.speak(`Opening ${tab.label} tab`, "high");
+                    // SPEAK ONLY — DO NOT CONTROL NAVIGATION
+                    voiceEngine.speak(`Opening ${tab.label} tab`, "high").catch(() => {});
 
                     if (navigator.vibrate) {
                       navigator.vibrate([80, 40, 80]);
                     }
-
-                    await Promise.resolve();
-                    router.push(tab.href);
                   }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
