@@ -334,6 +334,27 @@ export default function HomePage() {
         setStatus(phase.status);
       }
 
+      // HAPTIC FEEDBACK
+      if (phase.status === "Analyzing movement...") {
+        vibrate(40);
+      }
+
+      if (phase.message === "Attention") {
+        vibrate([80, 40, 80]);
+      }
+
+      if (phase.status === "Crossing ahead in 20 steps") {
+        vibrate([100, 50, 100]);
+      }
+
+      if (phase.status === "Crossing ahead in 10 steps. Turn left") {
+        vibrate([120, 60, 120]);
+      }
+
+      if (phase.status === "You have reached the crossing") {
+        vibrate([200, 100, 200]);
+      }
+
       // 3. Speak AFTER UI + vibration
       const start = performance.now();
       await speakAndWait(phase.message);
