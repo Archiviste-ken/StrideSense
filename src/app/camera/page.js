@@ -26,13 +26,7 @@ export default function CameraPage() {
   const analysisAbortRef = useRef(null);
   const analyzingRef = useRef(false);
 
-  const speakWithoutOverlap = (text) => {
-    if (typeof window !== "undefined") {
-      window.speechSynthesis?.cancel();
-    }
 
-    speak(text);
-  };
 
   const stopAnalysisRequest = () => {
     if (analysisAbortRef.current) {
@@ -107,12 +101,13 @@ export default function CameraPage() {
     const cameraLabel = nextFacingMode === "environment" ? "back" : "front";
 
     vibrate(120);
-    speakWithoutOverlap(`Switched to ${cameraLabel} camera`);
+    speak(`Switched to ${cameraLabel} camera`);
     setFacingMode(nextFacingMode);
     await startCamera(nextFacingMode);
   };
 
   const handleTakePicture = async () => {
+    if (navigator.vibrate) navigator.vibrate(30);
     if (!isCameraActive) {
       const cameraStarted = await startCamera();
       if (!cameraStarted) return;
@@ -148,7 +143,7 @@ export default function CameraPage() {
       setMessage("Analyzing surroundings...");
       vibrate([150, 80, 120]);
       await speak("Image captured");
-      speak("Analyzing scene");
+      await speak("Analyzing scene");
       const controller = new AbortController();
       analysisAbortRef.current = controller;
       const response = await fetch("/api/analyze-image", {
@@ -161,16 +156,20 @@ export default function CameraPage() {
       const result = data?.result || FALLBACK_ANALYSIS_MESSAGE;
       if (analysisAbortRef.current !== controller) return;
 
+      if (!result || result.trim().length === 0) {
+        speak("Unable to analyze image");
+        return;
+      }
+
       setMessage(result);
-      vibrate([100, 50, 100]);
+      if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
       await speak(result);
-      vibrate(200);
     } catch (error) {
       if (error?.name === "AbortError") return;
 
       setMessage("Network error. Please try again.");
-      speakWithoutOverlap(FALLBACK_ANALYSIS_MESSAGE);
-      vibrate(150);
+      speak("Unable to process image");
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     } finally {
       analysisAbortRef.current = null;
       analyzingRef.current = false;
@@ -188,7 +187,7 @@ export default function CameraPage() {
 
     setFollowUp(FOLLOW_UP_QUESTION);
     vibrate(120);
-    speakWithoutOverlap("Checking additional details");
+    speak("Checking additional details");
     setMessage(
       (previousMessage) =>
         `${previousMessage}\n\nAdditional insight: ${random}`,
@@ -197,12 +196,12 @@ export default function CameraPage() {
 
   const handleRepeatMessage = () => {
     if (isAnalyzing) {
-      speakWithoutOverlap("Analysis in progress");
+      speak("Analysis in progress");
       return;
     }
 
     vibrate(100);
-    speakWithoutOverlap(message);
+    speak(message);
   };
 
   const handleClosePanel = () => {
@@ -212,7 +211,7 @@ export default function CameraPage() {
     setFollowUp("");
     setMessage(INITIAL_MESSAGE);
     vibrate(120);
-    speakWithoutOverlap("Camera assist closed");
+    speak("Camera assist closed");
   };
 
   async function testFirebase() {
@@ -226,10 +225,11 @@ export default function CameraPage() {
     try {
       await testFirebase();
       setMessage("Firebase test write sent.");
-      speakWithoutOverlap("Firebase test write sent");
+      speak("Firebase test write sent");
     } catch {
       setMessage("Firebase test write failed.");
-      speakWithoutOverlap("Firebase test write failed");
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      speak("Firebase test write failed");
     }
   };
 

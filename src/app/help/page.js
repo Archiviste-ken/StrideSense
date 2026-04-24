@@ -47,6 +47,7 @@ export default function HelpPage() {
   const addedCalleeCandidates = useRef(new Set());
   const pendingCallerCandidates = useRef([]);
   const pendingCalleeCandidates = useRef([]);
+  const callEndedRef = useRef(false);
 
  useEffect(() => {
   if (typeof window === "undefined") return;
@@ -172,11 +173,43 @@ export default function HelpPage() {
     if (role !== "blind" || !docId) return;
 
     const requestRef = doc(db, "requests", docId);
+    let waitTimeout = null;
 
     const unsubscribe = onSnapshot(requestRef, async (snap) => {
-      if (!snap.exists()) return;
+      if (!snap.exists()) {
+        speak("No helper available right now");
+        return;
+      }
 
       const data = snap.data();
+
+      if (data.status === "waiting") {
+        if (!waitTimeout) {
+          waitTimeout = setTimeout(() => {
+            speak("No helper available right now");
+            setMessage("No helper available right now");
+            if (peerConnectionRef.current) {
+              peerConnectionRef.current.close();
+              peerConnectionRef.current = null;
+            }
+            if (localStreamRef.current) {
+              localStreamRef.current.getTracks().forEach((t) => t.stop());
+              localStreamRef.current = null;
+            }
+            if (typeof window !== "undefined") {
+              window.__CALL_ACTIVE__ = false;
+              window.localStorage.removeItem("activeRequestDocId");
+            }
+            setDocId(null);
+            setIsRequesting(false);
+          }, 30000);
+        }
+      } else {
+        if (waitTimeout) {
+          clearTimeout(waitTimeout);
+          waitTimeout = null;
+        }
+      }
 
       if (data.status === "connected") {
         if (data.calleeCandidates && peerConnectionRef.current) {
@@ -228,10 +261,16 @@ export default function HelpPage() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (waitTimeout) clearTimeout(waitTimeout);
+    };
   }, [docId, role, speak, vibrate]);
 
   const endCall = () => {
+    if (callEndedRef.current) return;
+    callEndedRef.current = true;
+
     try {
       if (peerConnectionRef.current) {
         peerConnectionRef.current.close();
@@ -267,6 +306,8 @@ export default function HelpPage() {
       setMessage("Call ended");
     } catch (err) {
       console.error("End call error:", err);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      speak("Something went wrong. Please try again");
     }
   };
 
@@ -302,6 +343,8 @@ export default function HelpPage() {
       }
     } catch (err) {
       console.error("Switch camera error:", err);
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      speak("Something went wrong. Please try again");
     }
   };
 
@@ -358,14 +401,24 @@ export default function HelpPage() {
       });
     }
 
+    const hasAnnouncedDisconnect = { current: false };
+
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       console.log("Connection state:", state);
 
-      if (state === "connected") setMessage("Connected");
+      if (state === "connected") {
+        if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+        setMessage("Connected");
+      }
       else if (state === "connecting") setMessage("Connecting...");
       else if (state === "failed" || state === "closed") {
         setMessage("Connection lost");
+        if (!hasAnnouncedDisconnect.current) {
+          hasAnnouncedDisconnect.current = true;
+          speak("Connection lost");
+          endCall();
+        }
       }
     };
 
@@ -454,6 +507,7 @@ export default function HelpPage() {
   }, []);
 
   const handleHelper = async () => {
+    if (navigator.vibrate) navigator.vibrate(30);
     if (role !== "blind") {
       speak("Switch to assistance mode to request help");
       return;
@@ -468,6 +522,7 @@ export default function HelpPage() {
 
     try {
       setIsRequesting(true);
+      callEndedRef.current = false;
       await startLocalStream();
 
       speak("Connecting to helper");
@@ -528,6 +583,7 @@ export default function HelpPage() {
   };
 
   const handleAcceptRequest = async () => {
+    if (navigator.vibrate) navigator.vibrate(30);
     if (!incomingRequest || isAccepting) return;
 
     if (
@@ -540,6 +596,7 @@ export default function HelpPage() {
 
     try {
       setIsAccepting(true);
+      callEndedRef.current = false;
       await startLocalStream();
 
       const requestRef = doc(db, "requests", incomingRequest.docId);

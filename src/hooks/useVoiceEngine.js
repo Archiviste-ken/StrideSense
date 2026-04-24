@@ -114,6 +114,9 @@ function createVoiceEngine() {
   }
 
   function speak(text, priority = "normal") {
+    if (typeof window !== "undefined" && window.__CALL_ACTIVE__) {
+      if (priority !== "high") return Promise.resolve();
+    }
     const normalized = normalizeText(text);
     if (!normalized) return Promise.resolve();
 
