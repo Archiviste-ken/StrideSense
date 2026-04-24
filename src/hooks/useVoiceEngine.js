@@ -102,6 +102,11 @@ function createVoiceEngine() {
     utterance.onerror = done;
 
     try {
+      try {
+        synth.cancel();
+      } catch {
+        // ignore
+      }
       synth.speak(utterance);
     } catch {
       done();

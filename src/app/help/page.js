@@ -17,12 +17,14 @@ import {
 } from "firebase/firestore";
 import { useEffect, useRef, useState } from "react";
 import { useAssistiveFeedback } from "../../hooks/useAssistiveFeedback";
+import { useVoiceEngine } from "../../hooks/useVoiceEngine";
 
 
 
 
 export default function HelpPage() {
   const { speak, vibrate, notifyComingSoon } = useAssistiveFeedback();
+  const voiceEngine = useVoiceEngine();
   const { role } = useUserRole();
   const [message, setMessage] = useState(
     "Live assistance feature coming soon.",
@@ -628,7 +630,11 @@ export default function HelpPage() {
         <div className="rounded-3xl bg-slate-900/80 border border-slate-800 p-5 space-y-4 shadow-lg">
           <button
             type="button"
-            onClick={handleHelper}
+            onClick={() => {
+              if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+              voiceEngine.speak("Calling helper", "high");
+              handleHelper();
+            }}
             aria-label="Call a helper for assistance"
             disabled={isRequesting}
             className="w-full min-h-[88px] rounded-3xl bg-sky-500 text-xl md:text-2xl font-semibold text-white shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
@@ -652,7 +658,11 @@ export default function HelpPage() {
               </p>
               <button
                 type="button"
-                onClick={handleAcceptRequest}
+                onClick={() => {
+                  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+                  voiceEngine.speak("Accepting request", "high");
+                  handleAcceptRequest();
+                }}
                 aria-label="Accept incoming help request"
                 disabled={isAccepting}
                 className="w-full min-h-[76px] rounded-3xl bg-sky-500 text-lg md:text-xl font-semibold text-white shadow focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-neutral-950 hover:bg-sky-400 active:bg-sky-500/80 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
@@ -686,7 +696,11 @@ export default function HelpPage() {
         className="w-full h-[60vh] rounded-xl bg-black object-cover"
       />
       <button
-        onClick={endCall}
+        onClick={() => {
+          if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+          voiceEngine.speak("Ending call", "high");
+          endCall();
+        }}
         className="mt-3 w-full py-3 bg-red-500 text-white rounded-xl font-semibold"
       >
         End Call

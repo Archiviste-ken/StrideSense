@@ -52,11 +52,17 @@ export function AppShell({ children }) {
                       return;
                     }
 
-                    voiceEngine.speak(`Opening ${tab.label} tab`, "high");
-
                     if (navigator.vibrate) {
-                      navigator.vibrate(80);
+                      navigator.vibrate([80, 40, 80]);
                     }
+
+                    if (typeof window !== "undefined" && window.speechSynthesis) {
+                      window.speechSynthesis.cancel();
+                    }
+
+                    setTimeout(() => {
+                      voiceEngine.speak(`Opening ${tab.label} tab`, "high");
+                    }, 30);
                   }}
                   className={`flex flex-col items-center justify-center rounded-full min-h-[56px] px-3 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2 focus-visible:ring-offset-black transition-colors ${
                     isActive
