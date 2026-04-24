@@ -183,7 +183,7 @@ export default function HomePage() {
       simulationPausedRef.current = false;
       if (!simulationStartedRef.current) {
         clearAllTimers();
-        vibrate([100, 50, 100]);
+        safeVibrate([100, 50, 100]);
 
         simulationStartedRef.current = true;
 
@@ -196,7 +196,7 @@ export default function HomePage() {
       setStatus(ASSISTANCE_STATUS.walking);
       clearConfirmationLoop();
     } else {
-      vibrate([200, 100, 200]);
+      safeVibrate([200, 100, 200]);
       if (
         performance.now() - lastStartChangeRef.current > 4000 &&
         stableStopped
@@ -342,23 +342,23 @@ export default function HomePage() {
 
       // HAPTIC FEEDBACK
       if (phase.status === "Analyzing movement...") {
-        vibrate(40);
+        safeVibrate(40);
       }
 
-      if (phase.message === "Attention") {
-        vibrate([80, 40, 80]);
+      if (phase.message && phase.message.includes("Attention")) {
+        safeVibrate([80, 40, 80]);
       }
 
-      if (phase.status === "Crossing ahead in 20 steps") {
-        vibrate([100, 50, 100]);
+      if (phase.status === ASSISTANCE_STATUS.crossing20) {
+        safeVibrate([100, 50, 100]);
       }
 
-      if (phase.status === "Crossing ahead in 10 steps. Turn left") {
-        vibrate([120, 60, 120]);
+      if (phase.status === ASSISTANCE_STATUS.crossing10) {
+        safeVibrate([120, 60, 120]);
       }
 
-      if (phase.status === "You have reached the crossing") {
-        vibrate([200, 100, 200]);
+      if (phase.status === ASSISTANCE_STATUS.reached) {
+        safeVibrate([200, 100, 200]);
       }
 
       // 3. Speak AFTER UI + vibration
@@ -434,7 +434,7 @@ export default function HomePage() {
       clearTrackingAnimation();
       movementStateRef.current = false;
       setIsRealMovement(false);
-      lastChangeRef.current = 0;
+
       setStatus(ASSISTANCE_STATUS.idle);
       speakAndRemember("Assistance stopped");
     }
