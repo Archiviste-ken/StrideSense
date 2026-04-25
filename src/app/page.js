@@ -376,6 +376,27 @@ export default function HomePage() {
     simulationStartedRef.current = false;
   };
 
+
+  const hasAnnouncedRef = useRef(false);
+
+useEffect(() => {
+  if (hasAnnouncedRef.current) return;
+
+  hasAnnouncedRef.current = true;
+
+  // Strong haptic feedback
+  safeVibrate([200, 100, 200]);
+
+  // Delay slightly to avoid clash with browser load
+  setTimeout(() => {
+    voiceEngine.speak(
+      "App opened. You are on the home page",
+      "high"
+    );
+  }, 300);
+
+}, []);
+
   useEffect(() => {
     return () => {
       activeRef.current = false;
