@@ -48,26 +48,6 @@ export default function HelpPage() {
   const pendingCallerCandidates = useRef([]);
   const pendingCalleeCandidates = useRef([]);
   const callEndedRef = useRef(false);
-  const turnTimeoutRef = useRef(null);
-  const connectionTimeoutRef = useRef(null);
-  const hardTimeoutRef = useRef(null);
-  const latestCallerCandidatesRef = useRef([]);
-  const latestCalleeCandidatesRef = useRef([]);
-  const unsubscribesRef = useRef([]);
-
-  function flushCandidates(pc, pendingArray) {
-    if (!pc || !pc.remoteDescription) return;
-
-    pendingArray.forEach(c => {
-      try {
-        pc.addIceCandidate(new RTCIceCandidate(c));
-      } catch (e) {
-        console.error("ICE flush error", e);
-      }
-    });
-
-    pendingArray.length = 0;
-  }
 
  useEffect(() => {
   if (typeof window === "undefined") return;
@@ -129,7 +109,7 @@ export default function HelpPage() {
       limit(1),
     );
 
-    const unsubscribe = onSnapshot(collection(db, "requests"), (snapshot) => {
+    const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
         setIncomingRequest(null);
         return;
@@ -146,10 +126,20 @@ export default function HelpPage() {
             const key = c.candidate || JSON.stringify(c);
             if (!addedCallerCandidates.current.has(key)) {
               addedCallerCandidates.current.add(key);
-              pendingCallerCandidates.current.push(c);
+              if (
+                peerConnectionRef.current &&
+                peerConnectionRef.current.remoteDescription
+              ) {
+                try {
+                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                } catch (e) {
+                  console.error("ICE error", e);
+                }
+              } else {
+                pendingCallerCandidates.current.push(c);
+              }
             }
           });
-          flushCandidates(peerConnectionRef.current, pendingCallerCandidates.current);
         }
 
         if (helperRedirected.current) return;
@@ -174,7 +164,6 @@ export default function HelpPage() {
 
       setIncomingRequest(null);
     });
-    unsubscribesRef.current.push(unsubscribe);
 
     return () => unsubscribe();
   }, [role, speak, vibrate]);
@@ -185,13 +174,13 @@ export default function HelpPage() {
     const requestRef = doc(db, "requests", docId);
     let waitTimeout = null;
 
-    const unsub = onSnapshot(doc(db, "requests", docId), async (docSnap) => {
-      if (!docSnap.exists()) {
+    const unsubscribe = onSnapshot(requestRef, async (snap) => {
+      if (!snap.exists()) {
         speak("No helper available right now");
         return;
       }
 
-      const data = docSnap.data();
+      const data = snap.data();
 
       if (data.status === "waiting") {
         if (!waitTimeout) {
@@ -221,23 +210,26 @@ export default function HelpPage() {
         }
       }
 
-        if (data.callerCandidates) {
-          latestCallerCandidatesRef.current = data.callerCandidates;
-        }
-        if (data.calleeCandidates) {
-          latestCalleeCandidatesRef.current = data.calleeCandidates;
-        }
-
-        if (data.status === "connected") {
+      if (data.status === "connected") {
         if (data.calleeCandidates && peerConnectionRef.current) {
           data.calleeCandidates.forEach(c => {
             const key = c.candidate || JSON.stringify(c);
             if (!addedCalleeCandidates.current.has(key)) {
               addedCalleeCandidates.current.add(key);
-              pendingCalleeCandidates.current.push(c);
+              if (
+                peerConnectionRef.current &&
+                peerConnectionRef.current.remoteDescription
+              ) {
+                try {
+                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                } catch (e) {
+                  console.error("ICE error", e);
+                }
+              } else {
+                pendingCalleeCandidates.current.push(c);
+              }
             }
           });
-          flushCandidates(peerConnectionRef.current, pendingCalleeCandidates.current);
         }
 
         if (blindRedirected.current) return;
@@ -255,8 +247,14 @@ export default function HelpPage() {
             new RTCSessionDescription(data.answer)
           );
 
-          console.log("Remote description set (Blind). Flushing candidates");
-          flushCandidates(peerConnectionRef.current, pendingCalleeCandidates.current);
+          pendingCalleeCandidates.current.forEach(c => {
+            try {
+              peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+            } catch (e) {
+              console.error("ICE error", e);
+            }
+          });
+          pendingCalleeCandidates.current = [];
         }
       }
     });
@@ -301,15 +299,6 @@ export default function HelpPage() {
       setIsAccepting(false);
       audioReadyRef.current = false;
       userInteractedRef.current = false;
-
-      if (turnTimeoutRef.current) clearTimeout(turnTimeoutRef.current);
-      if (connectionTimeoutRef.current) clearTimeout(connectionTimeoutRef.current);
-      if (hardTimeoutRef.current) clearTimeout(hardTimeoutRef.current);
-
-      unsubscribesRef.current.forEach(unsub => {
-        if (typeof unsub === "function") unsub();
-      });
-      unsubscribesRef.current = [];
 
       speak("Call ended");
       setMessage("Call ended");
@@ -375,30 +364,34 @@ export default function HelpPage() {
   function createPeerConnection() {
     const pc = new RTCPeerConnection({
       iceServers: [
-        {
-          urls: "stun:stun.l.google.com:19302"
-        },
-        {
-          urls: "stun:stun.relay.metered.ca:80",
-        },
-        {
-          urls: [
-            "turn:global.relay.metered.ca:80",
-            "turn:global.relay.metered.ca:80?transport=tcp",
-            "turn:global.relay.metered.ca:443",
-            "turns:global.relay.metered.ca:443?transport=tcp"
-          ],
-          username: "b0d25bf34932b58ceb25ce32",
-          credential: "ZtAesj+KIlI358Kc",
-        },
-      ],
-      iceTransportPolicy: "all"
-  });
+      {
+        urls: "stun:stun.relay.metered.ca:80",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "b0d25bf34932b58ceb25ce32",
+        credential: "ZtAesj+KIlI358Kc",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80?transport=tcp",
+        username: "b0d25bf34932b58ceb25ce32",
+        credential: "ZtAesj+KIlI358Kc",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:443",
+        username: "b0d25bf34932b58ceb25ce32",
+        credential: "ZtAesj+KIlI358Kc",
+      },
+      {
+        urls: "turns:global.relay.metered.ca:443?transport=tcp",
+        username: "b0d25bf34932b58ceb25ce32",
+        credential: "ZtAesj+KIlI358Kc",
+      },
+  ],
+      iceTransportPolicy: "all" // allow both direct + relay
+    });
 
-  pc.onicecandidateerror = (e) => {
-    console.error("ICE error:", e);
-  };
-
+    console.log("Using ICE servers:", pc.getConfiguration());
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
@@ -494,9 +487,7 @@ export default function HelpPage() {
         audioReadyRef.current = true;
 
         console.log("Audio tracks:", stream.getAudioTracks());
-        setTimeout(() => {
-          tryPlayAudio();
-        }, 300);
+        tryPlayAudio();
       }
     };
 
@@ -533,119 +524,6 @@ export default function HelpPage() {
       speak("Connecting to helper");
       const pc = createPeerConnection();
 
-      const turnDetected = { current: false };
-      turnTimeoutRef.current = setTimeout(() => {
-        if (!turnDetected.current) {
-          console.warn("No TURN relay — connection may fail on cross-network");
-        }
-      }, 5000);
-
-      connectionTimeoutRef.current = setTimeout(async () => {
-        if (pc.connectionState !== "connected" && pc.signalingState === "stable") {
-          console.warn("Retrying connection...");
-          try {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            if (requestRef) {
-              await updateDoc(requestRef, {
-                offer: pc.localDescription.toJSON()
-              });
-            }
-          } catch (e) {
-            console.error("Retry error", e);
-            console.error("FINAL FAILURE: TURN/network blocked");
-          }
-        }
-      }, 10000);
-
-      hardTimeoutRef.current = setTimeout(() => {
-        if (pc.connectionState !== "connected" && !callEndedRef.current) {
-          console.error("FINAL FAILURE: Ending call");
-          speak("Unable to connect. Please try again");
-          endCall();
-        }
-      }, 15000);
-
-      let requestRef = null;
-      let queuedCandidates = [];
-      let localCallerCandidates = [];
-
-      let candidateBuffer = [];
-      let updateTimeout = null;
-
-      pc.onicecandidate = (event) => {
-        if (!event.candidate) return;
-
-        console.log("ICE:", event.candidate.candidate);
-        if (event.candidate.candidate.includes("relay")) {
-          turnDetected.current = true;
-          console.log("Using TURN relay");
-        }
-
-        const cand = event.candidate.toJSON();
-
-        if (!requestRef) {
-          queuedCandidates.push(cand);
-          return;
-        }
-
-        candidateBuffer.push(cand);
-
-        if (!updateTimeout) {
-          updateTimeout = setTimeout(async () => {
-            try {
-              const existing = latestCallerCandidatesRef.current;
-              await updateDoc(requestRef, {
-                callerCandidates: [...existing, ...candidateBuffer]
-              });
-              candidateBuffer = [];
-              updateTimeout = null;
-            } catch (e) {
-              console.error("Batch update error", e);
-              updateTimeout = null;
-            }
-          }, 250);
-        }
-      };
-
-      pc.oniceconnectionstatechange = async () => {
-        console.log("ICE state (Caller):", pc.iceConnectionState);
-
-        if (pc.iceConnectionState === "failed" && pc.signalingState === "stable") {
-          console.warn("Restarting ICE...");
-          try {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            if (requestRef) {
-              await updateDoc(requestRef, {
-                offer: pc.localDescription.toJSON()
-              });
-            }
-          } catch (e) {
-            console.error("ICE restart error", e);
-          }
-        }
-
-        if (pc.iceConnectionState === "disconnected") {
-          console.warn("Temporary disconnect detected");
-          setTimeout(async () => {
-            if (pc.iceConnectionState !== "connected" && pc.signalingState === "stable" && !callEndedRef.current) {
-              console.warn("Attempting ICE recovery...");
-              try {
-                const offer = await pc.createOffer({ iceRestart: true });
-                await pc.setLocalDescription(offer);
-                if (requestRef) {
-                  await updateDoc(requestRef, {
-                    offer: pc.localDescription.toJSON()
-                  });
-                }
-              } catch (e) {
-                console.error("Recovery failed", e);
-              }
-            }
-          }, 3000);
-        }
-      };
 
       const offer = await pc.createOffer();
       await pc.setLocalDescription(offer);
@@ -663,28 +541,19 @@ export default function HelpPage() {
         status: "waiting",
         takenBy: null,
         createdAt: Date.now(),
-        offer: pc.localDescription.toJSON(),
+        offer: offer,
         answer: null,
       });
 
-      requestRef = doc(db, "requests", docRef.id);
+      const requestRef = doc(db, "requests", docRef.id);
 
-      const unsubscribeLocal = onSnapshot(requestRef, (snap) => {
-       const data = snap.data();
-        if (data?.callerCandidates) latestCallerCandidatesRef.current = data.callerCandidates;
-        if (data?.calleeCandidates) latestCalleeCandidatesRef.current = data.calleeCandidates;
-      });
-      unsubscribesRef.current.push(unsubscribeLocal);
-
-      try {
-        const existing = latestCallerCandidatesRef.current;
-        await updateDoc(requestRef, {
-          callerCandidates: [...existing, ...queuedCandidates]
-        });
-        queuedCandidates = [];
-      } catch (e) {
-        console.error("Queue flush error", e);
-      }
+      pc.onicecandidate = async (event) => {
+        if (event.candidate) {
+          await updateDoc(requestRef, {
+            callerCandidates: arrayUnion(event.candidate.toJSON())
+          });
+        }
+      };
 
       setDocId(docRef.id);
       if (typeof window !== "undefined") {
@@ -723,7 +592,7 @@ export default function HelpPage() {
       callEndedRef.current = false;
       await startLocalStream();
 
-      let requestRef = doc(db, "requests", incomingRequest.docId);
+      const requestRef = doc(db, "requests", incomingRequest.docId);
       const latestSnap = await getDoc(requestRef);
 
       if (!latestSnap.exists()) {
@@ -740,126 +609,31 @@ export default function HelpPage() {
 
       const pc = createPeerConnection();
 
-      const turnDetected = { current: false };
-      turnTimeoutRef.current = setTimeout(() => {
-        if (!turnDetected.current) {
-          console.warn("No TURN relay — connection may fail on cross-network");
-        }
-      }, 5000);
-
-      connectionTimeoutRef.current = setTimeout(async () => {
-        if (pc.connectionState !== "connected" && pc.signalingState === "stable") {
-          console.warn("Retrying connection...");
-          try {
-            const offer = await pc.createOffer({ iceRestart: true });
-            await pc.setLocalDescription(offer);
-            if (requestRef) {
-              await updateDoc(requestRef, {
-                offer: pc.localDescription.toJSON()
-              });
-            }
-          } catch (e) {
-            console.error("Retry error", e);
-            console.error("FINAL FAILURE: TURN/network blocked");
-          }
-        }
-      }, 10000);
-
-      hardTimeoutRef.current = setTimeout(() => {
-        if (pc.connectionState !== "connected" && !callEndedRef.current) {
-          console.error("FINAL FAILURE: Ending call");
-          speak("Unable to connect. Please try again");
-          endCall();
-        }
-      }, 15000);
-
-      let helpRequestRef = requestRef; 
-      let queuedHelperCandidates = [];
-      let localCalleeCandidates = [];
-
-      let candidateBuffer = [];
-      let updateTimeout = null;
-
-      pc.onicecandidate = (event) => {
-        if (!event.candidate) return;
-
-        console.log("ICE:", event.candidate.candidate);
-        if (event.candidate.candidate.includes("relay")) {
-          turnDetected.current = true;
-          console.log("Using TURN relay");
-        }
-
-        const cand = event.candidate.toJSON();
-
-        if (!helpRequestRef) {
-          queuedHelperCandidates.push(cand);
-          return;
-        }
-
-        candidateBuffer.push(cand);
-
-        if (!updateTimeout) {
-          updateTimeout = setTimeout(async () => {
-            try {
-              const existing = latestCalleeCandidatesRef.current;
-              await updateDoc(helpRequestRef, {
-                calleeCandidates: [...existing, ...candidateBuffer]
-              });
-              candidateBuffer = [];
-              updateTimeout = null;
-            } catch (e) {
-              console.error("Batch update error", e);
-              updateTimeout = null;
-            }
-          }, 250);
+      pc.onicecandidate = async (event) => {
+        if (event.candidate && incomingRequest.docId) {
+          const requestRef = doc(db, "requests", incomingRequest.docId);
+          await updateDoc(requestRef, {
+            calleeCandidates: arrayUnion(event.candidate.toJSON())
+          });
         }
       };
       await pc.setRemoteDescription(
         new RTCSessionDescription(latestData.offer)
       );
 
-      console.log("Remote description set (Helper). Flushing candidates");
-      flushCandidates(pc, pendingCallerCandidates.current);
+      pendingCallerCandidates.current.forEach(c => {
+        try {
+          peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+        } catch (e) {
+          console.error("ICE error", e);
+        }
+      });
+      pendingCallerCandidates.current = [];
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = true;
-      }
-
-
-      const unsubscribeHelperDoc = onSnapshot(requestRef, async (snap) => {
-       const data = snap.data();
-        if (!data) return;
-        
-        if (data.callerCandidates) latestCallerCandidatesRef.current = data.callerCandidates;
-        if (data.calleeCandidates) latestCalleeCandidatesRef.current = data.calleeCandidates;
-
-        // ICE Restart (re-negotiation)
-        if (data.offer && pc.remoteDescription && data.offer.sdp !== pc.remoteDescription.sdp) {
-          console.log("New offer received (ICE Restart)");
-          try {
-            await pc.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const answer = await pc.createAnswer();
-            await pc.setLocalDescription(answer);
-            await updateDoc(requestRef, {
-              answer: pc.localDescription.toJSON()
-            });
-          } catch (e) {
-            console.error("Callee re-negotiation error", e);
-          }
-        }
-      });
-      unsubscribesRef.current.push(unsubscribeHelperDoc);
-
-      try {
-        const existing = latestCalleeCandidatesRef.current;
-        await updateDoc(requestRef, {
-          calleeCandidates: [...existing, ...queuedHelperCandidates]
-        });
-        queuedHelperCandidates = [];
-      } catch (e) {
-        console.error("Queue flush error", e);
       }
 
       await updateDoc(requestRef, {
