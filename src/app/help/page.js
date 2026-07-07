@@ -48,6 +48,7 @@ export default function HelpPage() {
   const pendingCallerCandidates = useRef([]);
   const pendingCalleeCandidates = useRef([]);
   const callEndedRef = useRef(false);
+  const helperRequestUnsubscribeRef = useRef(null);
 
   const logException = (label, error) => {
     console.error(label, error);
@@ -425,6 +426,10 @@ export default function HelpPage() {
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = false;
       }
+      if (helperRequestUnsubscribeRef.current) {
+        helperRequestUnsubscribeRef.current();
+        helperRequestUnsubscribeRef.current = null;
+      }
       helperRedirected.current = false;
       blindRedirected.current = false;
       setDocId(null);
@@ -566,6 +571,9 @@ export default function HelpPage() {
       }
 
       if (state === "connected") {
+        if (role !== "helper") {
+          console.log("[CALLER] Connection connected");
+        }
         setMessage("Connected");
       }
       else if (state === "connecting") setMessage("Connecting...");
@@ -583,8 +591,20 @@ export default function HelpPage() {
       console.log("ICE state:", pc.iceConnectionState);
       if (role === "helper") {
         console.log("[HELPER] ICE state", pc.iceConnectionState);
+        if (pc.iceConnectionState === "checking") {
+          console.log("[HELPER] ICE checking");
+        }
+        if (pc.iceConnectionState === "connected") {
+          console.log("[HELPER] ICE connected");
+        }
       } else {
         console.log("[CALLER] ICE state", pc.iceConnectionState);
+        if (pc.iceConnectionState === "checking") {
+          console.log("[CALLER] ICE checking");
+        }
+        if (pc.iceConnectionState === "connected") {
+          console.log("[CALLER] ICE connected");
+        }
       }
     };
 
@@ -689,6 +709,10 @@ export default function HelpPage() {
 
   useEffect(() => {
     return () => {
+      if (helperRequestUnsubscribeRef.current) {
+        helperRequestUnsubscribeRef.current();
+        helperRequestUnsubscribeRef.current = null;
+      }
       if (localStreamRef.current) {
         localStreamRef.current.getTracks().forEach((track) => track.stop());
       }
@@ -847,6 +871,11 @@ export default function HelpPage() {
 
       const pc = createPeerConnection();
 
+      if (helperRequestUnsubscribeRef.current) {
+        helperRequestUnsubscribeRef.current();
+        helperRequestUnsubscribeRef.current = null;
+      }
+
       pc.onicecandidate = async (event) => {
         logIceCandidateDetails(event);
         if (!event.candidate || !incomingRequest.docId) return;
@@ -870,6 +899,39 @@ export default function HelpPage() {
         throw error;
       }
       console.log("[HELPER] Remote offer applied");
+
+      helperRequestUnsubscribeRef.current = onSnapshot(requestRef, (snap) => {
+        if (!snap.exists()) {
+          return;
+        }
+
+        const requestData = snap.data();
+        logSnapshotDetails(snap.id, requestData);
+
+        if (requestData.callerCandidates && peerConnectionRef.current) {
+          requestData.callerCandidates.forEach((c) => {
+            const key = c.candidate || JSON.stringify(c);
+            if (!addedCallerCandidates.current.has(key)) {
+              addedCallerCandidates.current.add(key);
+              if (
+                peerConnectionRef.current &&
+                peerConnectionRef.current.remoteDescription
+              ) {
+                console.log("[HELPER] Caller ICE added", c);
+                void peerConnectionRef.current
+                  .addIceCandidate(new RTCIceCandidate(c))
+                  .catch((error) => {
+                    logException("[ERROR] addIceCandidate", error);
+                    logException("ICE error", error);
+                    throw error;
+                  });
+              } else {
+                pendingCallerCandidates.current.push(c);
+              }
+            }
+          });
+        }
+      });
 
       await flushPendingCandidates({
         candidatesRef: pendingCallerCandidates,
@@ -925,6 +987,10 @@ export default function HelpPage() {
       setMessage("Connecting to user...");
       setIncomingRequest(null);
     } catch (error) {
+      if (helperRequestUnsubscribeRef.current) {
+        helperRequestUnsubscribeRef.current();
+        helperRequestUnsubscribeRef.current = null;
+      }
       logException("[ERROR] handleAcceptRequest", error);
       speak("Unable to accept request");
       setMessage("Unable to accept request. Try again.");
