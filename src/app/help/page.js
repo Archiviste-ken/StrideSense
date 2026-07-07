@@ -49,6 +49,36 @@ export default function HelpPage() {
   const pendingCalleeCandidates = useRef([]);
   const callEndedRef = useRef(false);
 
+  const logSnapshotDetails = (requestId, data) => {
+    console.log("[SNAPSHOT]", {
+      requestId,
+      status: data?.status ?? null,
+      offerExists: !!data?.offer,
+      answerExists: !!data?.answer,
+      callerCandidatesCount: Array.isArray(data?.callerCandidates)
+        ? data.callerCandidates.length
+        : 0,
+      calleeCandidatesCount: Array.isArray(data?.calleeCandidates)
+        ? data.calleeCandidates.length
+        : 0,
+    });
+  };
+
+  const logIceCandidateDetails = (event) => {
+    console.log("[ICE]", event.candidate?.candidate);
+
+    const candidateString = event.candidate?.candidate || "";
+    if (candidateString.includes(" typ relay ")) {
+      console.log("TURN RELAY CANDIDATE DETECTED");
+    }
+    if (candidateString.includes(" typ srflx ")) {
+      console.log("STUN CANDIDATE DETECTED");
+    }
+    if (candidateString.includes(" typ host ")) {
+      console.log("HOST CANDIDATE DETECTED");
+    }
+  };
+
  useEffect(() => {
   if (typeof window === "undefined") return;
 
@@ -111,12 +141,21 @@ export default function HelpPage() {
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       if (snapshot.empty) {
+        console.log("[SNAPSHOT]", {
+          requestId: null,
+          status: null,
+          offerExists: false,
+          answerExists: false,
+          callerCandidatesCount: 0,
+          calleeCandidatesCount: 0,
+        });
         setIncomingRequest(null);
         return;
       }
 
       const docSnap = snapshot.docs[0];
       const data = docSnap.data();
+      logSnapshotDetails(docSnap.id, data);
 
       if (!data.createdAt || typeof data.createdAt !== "number") return;
 
@@ -131,9 +170,13 @@ export default function HelpPage() {
                 peerConnectionRef.current.remoteDescription
               ) {
                 try {
+                  console.log("[HELPER 12] Adding caller ICE", c);
                   peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                  console.log("[HELPER 13] Caller ICE added", c);
                 } catch (e) {
+                  console.error("[ERROR] addIceCandidate", e);
                   console.error("ICE error", e);
+                  throw e;
                 }
               } else {
                 pendingCallerCandidates.current.push(c);
@@ -155,6 +198,7 @@ export default function HelpPage() {
       }
 
       if (data.status === "waiting") {
+        console.log("[HELPER 1] Incoming request detected", docSnap.id);
         setIncomingRequest({
           docId: docSnap.id,
           ...data,
@@ -176,11 +220,20 @@ export default function HelpPage() {
 
     const unsubscribe = onSnapshot(requestRef, async (snap) => {
       if (!snap.exists()) {
+        console.log("[SNAPSHOT]", {
+          requestId: snap.id,
+          status: null,
+          offerExists: false,
+          answerExists: false,
+          callerCandidatesCount: 0,
+          calleeCandidatesCount: 0,
+        });
         speak("No helper available right now");
         return;
       }
 
       const data = snap.data();
+      logSnapshotDetails(snap.id, data);
 
       if (data.status === "waiting") {
         if (!waitTimeout) {
@@ -221,9 +274,13 @@ export default function HelpPage() {
                 peerConnectionRef.current.remoteDescription
               ) {
                 try {
+                  console.log("[CALLER 15] Adding remote ICE candidate", c);
                   peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+                  console.log("[CALLER 16] Remote ICE candidate added", c);
                 } catch (e) {
+                  console.error("[ERROR] addIceCandidate", e);
                   console.error("ICE error", e);
+                  throw e;
                 }
               } else {
                 pendingCalleeCandidates.current.push(c);
@@ -243,18 +300,32 @@ export default function HelpPage() {
         console.log("Redirect blocked for WebRTC setup");
 
         if (data.answer && peerConnectionRef.current) {
-          await peerConnectionRef.current.setRemoteDescription(
-            new RTCSessionDescription(data.answer)
-          );
+          console.log("[CALLER 10] Answer received from Firestore", snap.id);
+          console.log("[CALLER 11] Setting remote description");
+          try {
+            await peerConnectionRef.current.setRemoteDescription(
+              new RTCSessionDescription(data.answer)
+            );
+          } catch (error) {
+            console.error("[ERROR] setRemoteDescription", error);
+            throw error;
+          }
+          console.log("[CALLER 12] Remote description set");
 
+          console.log("[CALLER 13] Flushing pending ICE candidates");
           pendingCalleeCandidates.current.forEach(c => {
             try {
+              console.log("[CALLER 15] Adding remote ICE candidate", c);
               peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+              console.log("[CALLER 16] Remote ICE candidate added", c);
             } catch (e) {
+              console.error("[ERROR] addIceCandidate", e);
               console.error("ICE error", e);
+              throw e;
             }
           });
           pendingCalleeCandidates.current = [];
+          console.log("[CALLER 14] Pending ICE flushed");
         }
       }
     });
@@ -348,11 +419,21 @@ export default function HelpPage() {
 
   async function startLocalStream() {
     try {
+      if (role === "helper") {
+        console.log("[HELPER] getUserMedia started");
+      } else {
+        console.log("[CALLER 1] getUserMedia started");
+      }
       const stream = await navigator.mediaDevices.getUserMedia({
         video: true,
         audio: true,
       });
       localStreamRef.current = stream;
+      if (role === "helper") {
+        console.log("[HELPER] getUserMedia success");
+      } else {
+        console.log("[CALLER 2] getUserMedia success");
+      }
       if (localVideoRef.current) {
         localVideoRef.current.srcObject = stream;
       }
@@ -391,12 +472,23 @@ export default function HelpPage() {
       iceTransportPolicy: "all" // allow both direct + relay
     });
 
+    if (role === "helper") {
+      console.log("[HELPER 2] RTCPeerConnection created");
+    } else {
+      console.log("[CALLER 3] RTCPeerConnection created");
+    }
+
     console.log("Using ICE servers:", pc.getConfiguration());
 
     if (localStreamRef.current) {
       localStreamRef.current.getTracks().forEach((track) => {
         pc.addTrack(track, localStreamRef.current);
       });
+      if (role === "helper") {
+        console.log("[HELPER 3] Tracks added", localStreamRef.current.getTracks().length);
+      } else {
+        console.log("[CALLER 4] Tracks added", localStreamRef.current.getTracks().length);
+      }
     }
 
     const hasAnnouncedDisconnect = { current: false };
@@ -404,6 +496,11 @@ export default function HelpPage() {
     pc.onconnectionstatechange = () => {
       const state = pc.connectionState;
       console.log("Connection state:", state);
+      if (role === "helper") {
+        console.log("[HELPER 17] Connection state:", state);
+      } else {
+        console.log("[CALLER 20] Connection state:", state);
+      }
 
       if (state === "connected") {
         setMessage("Connected");
@@ -421,10 +518,30 @@ export default function HelpPage() {
 
     pc.oniceconnectionstatechange = () => {
       console.log("ICE state:", pc.iceConnectionState);
+      if (role === "helper") {
+        console.log("[HELPER 16] ICE state:", pc.iceConnectionState);
+      } else {
+        console.log("[CALLER 19] ICE state:", pc.iceConnectionState);
+      }
     };
 
     pc.ontrack = (event) => {
       console.log("TRACK RECEIVED");
+      if (role === "helper") {
+        console.log("[HELPER 14] ontrack fired", {
+          kind: event.track?.kind,
+          readyState: event.track?.readyState,
+          streams: event.streams?.length ?? 0,
+          tracks: event.streams?.[0]?.getTracks?.().length ?? 0,
+        });
+      } else {
+        console.log("[CALLER 17] ontrack fired", {
+          kind: event.track?.kind,
+          readyState: event.track?.readyState,
+          streams: event.streams?.length ?? 0,
+          tracks: event.streams?.[0]?.getTracks?.().length ?? 0,
+        });
+      }
       
       let stream = event.streams && event.streams[0];
 
@@ -489,6 +606,18 @@ export default function HelpPage() {
         console.log("Audio tracks:", stream.getAudioTracks());
         tryPlayAudio();
       }
+
+      if (role === "helper") {
+        console.log("[HELPER 15] Remote stream attached", {
+          videoTracks: stream.getVideoTracks().length,
+          audioTracks: stream.getAudioTracks().length,
+        });
+      } else {
+        console.log("[CALLER 18] Remote stream attached", {
+          videoTracks: stream.getVideoTracks().length,
+          audioTracks: stream.getAudioTracks().length,
+        });
+      }
     };
 
     peerConnectionRef.current = pc;
@@ -525,8 +654,22 @@ export default function HelpPage() {
       const pc = createPeerConnection();
 
 
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
+      console.log("[CALLER 5] Creating offer");
+      let offer;
+      try {
+        offer = await pc.createOffer();
+      } catch (error) {
+        console.error("[ERROR] createOffer", error);
+        throw error;
+      }
+      console.log("[CALLER 6] Offer created");
+      try {
+        await pc.setLocalDescription(offer);
+      } catch (error) {
+        console.error("[ERROR] setLocalDescription", error);
+        throw error;
+      }
+      console.log("[CALLER 7] Local description set");
 
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = true;
@@ -544,10 +687,12 @@ export default function HelpPage() {
         offer: offer,
         answer: null,
       });
+      console.log("[CALLER 8] Offer stored in Firestore", docRef.id);
 
       const requestRef = doc(db, "requests", docRef.id);
 
       pc.onicecandidate = async (event) => {
+        logIceCandidateDetails(event);
         if (event.candidate) {
           await updateDoc(requestRef, {
             callerCandidates: arrayUnion(event.candidate.toJSON())
@@ -556,6 +701,7 @@ export default function HelpPage() {
       };
 
       setDocId(docRef.id);
+      console.log("[CALLER 9] Waiting for answer", docRef.id);
       if (typeof window !== "undefined") {
         window.localStorage.setItem("activeRequestDocId", docRef.id);
       }
@@ -610,6 +756,7 @@ export default function HelpPage() {
       const pc = createPeerConnection();
 
       pc.onicecandidate = async (event) => {
+        logIceCandidateDetails(event);
         if (event.candidate && incomingRequest.docId) {
           const requestRef = doc(db, "requests", incomingRequest.docId);
           await updateDoc(requestRef, {
@@ -617,20 +764,47 @@ export default function HelpPage() {
           });
         }
       };
-      await pc.setRemoteDescription(
-        new RTCSessionDescription(latestData.offer)
-      );
+      console.log("[HELPER 4] Setting remote offer");
+      try {
+        await pc.setRemoteDescription(
+          new RTCSessionDescription(latestData.offer)
+        );
+      } catch (error) {
+        console.error("[ERROR] setRemoteDescription", error);
+        throw error;
+      }
+      console.log("[HELPER 5] Remote offer applied");
 
+      console.log("[HELPER 10] Flushing pending ICE");
       pendingCallerCandidates.current.forEach(c => {
         try {
+          console.log("[HELPER 12] Adding caller ICE", c);
           peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
+          console.log("[HELPER 13] Caller ICE added", c);
         } catch (e) {
+          console.error("[ERROR] addIceCandidate", e);
           console.error("ICE error", e);
+          throw e;
         }
       });
       pendingCallerCandidates.current = [];
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
+      console.log("[HELPER 11] Pending ICE flushed");
+      console.log("[HELPER 6] Creating answer");
+      let answer;
+      try {
+        answer = await pc.createAnswer();
+      } catch (error) {
+        console.error("[ERROR] createAnswer", error);
+        throw error;
+      }
+      console.log("[HELPER 7] Answer created");
+      try {
+        await pc.setLocalDescription(answer);
+      } catch (error) {
+        console.error("[ERROR] setLocalDescription", error);
+        throw error;
+      }
+      console.log("[HELPER 8] Local description set");
 
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = true;
@@ -641,6 +815,7 @@ export default function HelpPage() {
         status: "connected",
         answer: answer,
       });
+      console.log("[HELPER 9] Answer stored", incomingRequest.docId);
 
       speak("Connecting to user");
 
