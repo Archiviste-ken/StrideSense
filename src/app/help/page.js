@@ -49,6 +49,10 @@ export default function HelpPage() {
   const pendingCalleeCandidates = useRef([]);
   const callEndedRef = useRef(false);
 
+  const logException = (label, error) => {
+    console.error(label, error);
+  };
+
   const logSnapshotDetails = (requestId, data) => {
     console.log("[SNAPSHOT]", {
       requestId,
@@ -76,6 +80,61 @@ export default function HelpPage() {
     }
     if (candidateString.includes(" typ host ")) {
       console.log("HOST CANDIDATE DETECTED");
+    }
+  };
+
+  const flushPendingCandidates = async ({
+    candidatesRef,
+    peerConnection,
+    pendingLog,
+    addedLog,
+  }) => {
+    if (!peerConnection || !peerConnection.remoteDescription) {
+      return;
+    }
+
+    console.log(pendingLog);
+    const queuedCandidates = [...candidatesRef.current];
+    candidatesRef.current = [];
+
+    for (let index = 0; index < queuedCandidates.length; index += 1) {
+      const candidate = queuedCandidates[index];
+
+      try {
+        console.log(addedLog.before, candidate);
+        await peerConnection.addIceCandidate(new RTCIceCandidate(candidate));
+        console.log(addedLog.after, candidate);
+      } catch (error) {
+        candidatesRef.current = queuedCandidates.slice(index);
+        logException("[ERROR] addIceCandidate", error);
+        logException("ICE error", error);
+        throw error;
+      }
+    }
+
+    console.log(`${pendingLog} complete`);
+  };
+
+  const storeIceCandidate = async ({
+    requestRef,
+    field,
+    candidate,
+    generatedLog,
+    storedLog,
+    skipGeneratedLog = false,
+  }) => {
+    if (!skipGeneratedLog) {
+      console.log(generatedLog, candidate);
+    }
+    try {
+      await updateDoc(requestRef, {
+        [field]: arrayUnion(candidate),
+      });
+      console.log(storedLog, candidate);
+    } catch (error) {
+      logException("ICE STORE FAILED", error);
+      logException("[ERROR] updateDoc", error);
+      throw error;
     }
   };
 
@@ -161,7 +220,7 @@ export default function HelpPage() {
 
       if (data.status === "connected") {
         if (data.callerCandidates && peerConnectionRef.current) {
-          data.callerCandidates.forEach(c => {
+          data.callerCandidates.forEach((c) => {
             const key = c.candidate || JSON.stringify(c);
             if (!addedCallerCandidates.current.has(key)) {
               addedCallerCandidates.current.add(key);
@@ -169,15 +228,14 @@ export default function HelpPage() {
                 peerConnectionRef.current &&
                 peerConnectionRef.current.remoteDescription
               ) {
-                try {
-                  console.log("[HELPER 12] Adding caller ICE", c);
-                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
-                  console.log("[HELPER 13] Caller ICE added", c);
-                } catch (e) {
-                  console.error("[ERROR] addIceCandidate", e);
-                  console.error("ICE error", e);
-                  throw e;
-                }
+                console.log("[HELPER] Caller ICE added", c);
+                void peerConnectionRef.current
+                  .addIceCandidate(new RTCIceCandidate(c))
+                  .catch((error) => {
+                    logException("[ERROR] addIceCandidate", error);
+                    logException("ICE error", error);
+                    throw error;
+                  });
               } else {
                 pendingCallerCandidates.current.push(c);
               }
@@ -198,7 +256,7 @@ export default function HelpPage() {
       }
 
       if (data.status === "waiting") {
-        console.log("[HELPER 1] Incoming request detected", docSnap.id);
+        console.log("[HELPER] Incoming request", docSnap.id);
         setIncomingRequest({
           docId: docSnap.id,
           ...data,
@@ -265,7 +323,7 @@ export default function HelpPage() {
 
       if (data.status === "connected") {
         if (data.calleeCandidates && peerConnectionRef.current) {
-          data.calleeCandidates.forEach(c => {
+          data.calleeCandidates.forEach((c) => {
             const key = c.candidate || JSON.stringify(c);
             if (!addedCalleeCandidates.current.has(key)) {
               addedCalleeCandidates.current.add(key);
@@ -273,15 +331,14 @@ export default function HelpPage() {
                 peerConnectionRef.current &&
                 peerConnectionRef.current.remoteDescription
               ) {
-                try {
-                  console.log("[CALLER 15] Adding remote ICE candidate", c);
-                  peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
-                  console.log("[CALLER 16] Remote ICE candidate added", c);
-                } catch (e) {
-                  console.error("[ERROR] addIceCandidate", e);
-                  console.error("ICE error", e);
-                  throw e;
-                }
+                console.log("[CALLER] Remote ICE added", c);
+                void peerConnectionRef.current
+                  .addIceCandidate(new RTCIceCandidate(c))
+                  .catch((error) => {
+                    logException("[ERROR] addIceCandidate", error);
+                    logException("ICE error", error);
+                    throw error;
+                  });
               } else {
                 pendingCalleeCandidates.current.push(c);
               }
@@ -300,32 +357,26 @@ export default function HelpPage() {
         console.log("Redirect blocked for WebRTC setup");
 
         if (data.answer && peerConnectionRef.current) {
-          console.log("[CALLER 10] Answer received from Firestore", snap.id);
-          console.log("[CALLER 11] Setting remote description");
+          console.log("[CALLER] Answer received", snap.id);
           try {
             await peerConnectionRef.current.setRemoteDescription(
               new RTCSessionDescription(data.answer)
             );
           } catch (error) {
-            console.error("[ERROR] setRemoteDescription", error);
+            logException("[ERROR] setRemoteDescription", error);
             throw error;
           }
-          console.log("[CALLER 12] Remote description set");
+          console.log("[CALLER] Remote description set");
 
-          console.log("[CALLER 13] Flushing pending ICE candidates");
-          pendingCalleeCandidates.current.forEach(c => {
-            try {
-              console.log("[CALLER 15] Adding remote ICE candidate", c);
-              peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
-              console.log("[CALLER 16] Remote ICE candidate added", c);
-            } catch (e) {
-              console.error("[ERROR] addIceCandidate", e);
-              console.error("ICE error", e);
-              throw e;
-            }
+          await flushPendingCandidates({
+            candidatesRef: pendingCalleeCandidates,
+            peerConnection: peerConnectionRef.current,
+            pendingLog: "[CALLER] Flushing pending ICE candidates",
+            addedLog: {
+              before: "[CALLER] Remote ICE added",
+              after: "[CALLER] Remote ICE added",
+            },
           });
-          pendingCalleeCandidates.current = [];
-          console.log("[CALLER 14] Pending ICE flushed");
         }
       }
     });
@@ -374,7 +425,7 @@ export default function HelpPage() {
       speak("Call ended");
       setMessage("Call ended");
     } catch (err) {
-      console.error("End call error:", err);
+      logException("End call error:", err);
       if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
       speak("Something went wrong. Please try again");
     }
@@ -412,7 +463,7 @@ export default function HelpPage() {
         localVideoRef.current.srcObject = newStream;
       }
     } catch (err) {
-      console.error("Switch camera error:", err);
+      logException("Switch camera error:", err);
       speak("Something went wrong. Please try again");
     }
   };
@@ -438,7 +489,7 @@ export default function HelpPage() {
         localVideoRef.current.srcObject = stream;
       }
     } catch (err) {
-      console.error("Camera/Mic error:", err);
+      logException("Camera/Mic error:", err);
     }
   }
 
@@ -497,9 +548,9 @@ export default function HelpPage() {
       const state = pc.connectionState;
       console.log("Connection state:", state);
       if (role === "helper") {
-        console.log("[HELPER 17] Connection state:", state);
+        console.log("[HELPER] Connection state", state);
       } else {
-        console.log("[CALLER 20] Connection state:", state);
+        console.log("[CALLER] Connection state", state);
       }
 
       if (state === "connected") {
@@ -519,23 +570,23 @@ export default function HelpPage() {
     pc.oniceconnectionstatechange = () => {
       console.log("ICE state:", pc.iceConnectionState);
       if (role === "helper") {
-        console.log("[HELPER 16] ICE state:", pc.iceConnectionState);
+        console.log("[HELPER] ICE state", pc.iceConnectionState);
       } else {
-        console.log("[CALLER 19] ICE state:", pc.iceConnectionState);
+        console.log("[CALLER] ICE state", pc.iceConnectionState);
       }
     };
 
     pc.ontrack = (event) => {
       console.log("TRACK RECEIVED");
       if (role === "helper") {
-        console.log("[HELPER 14] ontrack fired", {
+        console.log("[HELPER] ontrack fired", {
           kind: event.track?.kind,
           readyState: event.track?.readyState,
           streams: event.streams?.length ?? 0,
           tracks: event.streams?.[0]?.getTracks?.().length ?? 0,
         });
       } else {
-        console.log("[CALLER 17] ontrack fired", {
+        console.log("[CALLER] ontrack fired", {
           kind: event.track?.kind,
           readyState: event.track?.readyState,
           streams: event.streams?.length ?? 0,
@@ -652,24 +703,46 @@ export default function HelpPage() {
 
       speak("Connecting to helper");
       const pc = createPeerConnection();
+      let requestRef = null;
+      const pendingLocalCallerCandidates = [];
 
+      pc.onicecandidate = async (event) => {
+        logIceCandidateDetails(event);
+        if (!event.candidate) return;
 
-      console.log("[CALLER 5] Creating offer");
+        const candidate = event.candidate.toJSON();
+
+        if (!requestRef) {
+          console.log("[CALLER] Local ICE generated", candidate);
+          pendingLocalCallerCandidates.push(candidate);
+          return;
+        }
+
+        await storeIceCandidate({
+          requestRef,
+          field: "callerCandidates",
+          candidate,
+          generatedLog: "[CALLER] Local ICE generated",
+          storedLog: "[CALLER] Local ICE stored",
+        });
+      };
+
+      console.log("[CALLER] Creating offer");
       let offer;
       try {
         offer = await pc.createOffer();
       } catch (error) {
-        console.error("[ERROR] createOffer", error);
+        logException("[ERROR] createOffer", error);
         throw error;
       }
-      console.log("[CALLER 6] Offer created");
+      console.log("[CALLER] Offer created");
       try {
         await pc.setLocalDescription(offer);
       } catch (error) {
-        console.error("[ERROR] setLocalDescription", error);
+        logException("[ERROR] setLocalDescription", error);
         throw error;
       }
-      console.log("[CALLER 7] Local description set");
+      console.log("[CALLER] Local description set");
 
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = true;
@@ -679,26 +752,33 @@ export default function HelpPage() {
       setMessage("Waiting for a helper...");
 
       const roomId = Math.random().toString(36).substring(2, 10);
-      const docRef = await addDoc(collection(db, "requests"), {
-        id: roomId,
-        status: "waiting",
-        takenBy: null,
-        createdAt: Date.now(),
-        offer: offer,
-        answer: null,
-      });
-      console.log("[CALLER 8] Offer stored in Firestore", docRef.id);
+      let docRef;
+      try {
+        docRef = await addDoc(collection(db, "requests"), {
+          id: roomId,
+          status: "waiting",
+          takenBy: null,
+          createdAt: Date.now(),
+          offer: offer,
+          answer: null,
+        });
+      } catch (error) {
+        logException("[ERROR] addDoc", error);
+        throw error;
+      }
+      console.log("[CALLER] Offer stored", docRef.id);
 
-      const requestRef = doc(db, "requests", docRef.id);
-
-      pc.onicecandidate = async (event) => {
-        logIceCandidateDetails(event);
-        if (event.candidate) {
-          await updateDoc(requestRef, {
-            callerCandidates: arrayUnion(event.candidate.toJSON())
-          });
-        }
-      };
+      requestRef = doc(db, "requests", docRef.id);
+      for (const candidate of pendingLocalCallerCandidates) {
+        await storeIceCandidate({
+          requestRef,
+          field: "callerCandidates",
+          candidate,
+          generatedLog: "[CALLER] Local ICE generated",
+          storedLog: "[CALLER] Local ICE stored",
+          skipGeneratedLog: true,
+        });
+      }
 
       setDocId(docRef.id);
       console.log("[CALLER 9] Waiting for answer", docRef.id);
@@ -708,7 +788,7 @@ export default function HelpPage() {
       speak("Request sent. Waiting for a helper");
       setMessage("Request sent. Waiting for a helper...");
     } catch (error) {
-      console.error(error);
+      logException("[ERROR] handleHelper", error);
       speak("Failed to request help");
       setMessage("Unable to request help. Try again.");
     } finally {
@@ -757,65 +837,70 @@ export default function HelpPage() {
 
       pc.onicecandidate = async (event) => {
         logIceCandidateDetails(event);
-        if (event.candidate && incomingRequest.docId) {
-          const requestRef = doc(db, "requests", incomingRequest.docId);
-          await updateDoc(requestRef, {
-            calleeCandidates: arrayUnion(event.candidate.toJSON())
-          });
-        }
+        if (!event.candidate || !incomingRequest.docId) return;
+
+        const candidate = event.candidate.toJSON();
+        await storeIceCandidate({
+          requestRef: requestRef,
+          field: "calleeCandidates",
+          candidate,
+          generatedLog: "[HELPER] Local ICE generated",
+          storedLog: "[HELPER] Local ICE stored",
+        });
       };
-      console.log("[HELPER 4] Setting remote offer");
+      console.log("[HELPER] Setting remote offer");
       try {
         await pc.setRemoteDescription(
           new RTCSessionDescription(latestData.offer)
         );
       } catch (error) {
-        console.error("[ERROR] setRemoteDescription", error);
+        logException("[ERROR] setRemoteDescription", error);
         throw error;
       }
-      console.log("[HELPER 5] Remote offer applied");
+      console.log("[HELPER] Remote offer applied");
 
-      console.log("[HELPER 10] Flushing pending ICE");
-      pendingCallerCandidates.current.forEach(c => {
-        try {
-          console.log("[HELPER 12] Adding caller ICE", c);
-          peerConnectionRef.current.addIceCandidate(new RTCIceCandidate(c));
-          console.log("[HELPER 13] Caller ICE added", c);
-        } catch (e) {
-          console.error("[ERROR] addIceCandidate", e);
-          console.error("ICE error", e);
-          throw e;
-        }
+      await flushPendingCandidates({
+        candidatesRef: pendingCallerCandidates,
+        peerConnection: peerConnectionRef.current,
+        pendingLog: "[HELPER] Flushing pending ICE",
+        addedLog: {
+          before: "[HELPER] Caller ICE added",
+          after: "[HELPER] Caller ICE added",
+        },
       });
-      pendingCallerCandidates.current = [];
-      console.log("[HELPER 11] Pending ICE flushed");
-      console.log("[HELPER 6] Creating answer");
+      console.log("[HELPER] Creating answer");
       let answer;
       try {
         answer = await pc.createAnswer();
       } catch (error) {
-        console.error("[ERROR] createAnswer", error);
+        logException("[ERROR] createAnswer", error);
         throw error;
       }
-      console.log("[HELPER 7] Answer created");
+      console.log("[HELPER] Answer created");
       try {
         await pc.setLocalDescription(answer);
       } catch (error) {
-        console.error("[ERROR] setLocalDescription", error);
+        logException("[ERROR] setLocalDescription", error);
         throw error;
       }
-      console.log("[HELPER 8] Local description set");
+      console.log("[HELPER] Local description set");
 
       if (typeof window !== "undefined") {
         window.__CALL_ACTIVE__ = true;
       }
 
-      await updateDoc(requestRef, {
-        takenBy: "helper-" + Date.now(),
-        status: "connected",
-        answer: answer,
-      });
-      console.log("[HELPER 9] Answer stored", incomingRequest.docId);
+      try {
+        await updateDoc(requestRef, {
+          takenBy: "helper-" + Date.now(),
+          status: "connected",
+          answer: answer,
+        });
+      } catch (error) {
+        logException("ICE STORE FAILED", error);
+        logException("[ERROR] updateDoc", error);
+        throw error;
+      }
+      console.log("[HELPER] Answer stored", incomingRequest.docId);
 
       speak("Connecting to user");
 
@@ -828,7 +913,7 @@ export default function HelpPage() {
       setMessage("Connecting to user...");
       setIncomingRequest(null);
     } catch (error) {
-      console.error(error);
+      logException("[ERROR] handleAcceptRequest", error);
       speak("Unable to accept request");
       setMessage("Unable to accept request. Try again.");
     } finally {
