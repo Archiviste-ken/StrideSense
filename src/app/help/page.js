@@ -277,6 +277,7 @@ export default function HelpPage() {
     let waitTimeout = null;
 
     const unsubscribe = onSnapshot(requestRef, async (snap) => {
+      console.log("[CALLER] Snapshot fired", snap.id);
       if (!snap.exists()) {
         console.log("[SNAPSHOT]", {
           requestId: snap.id,
@@ -331,9 +332,12 @@ export default function HelpPage() {
                 peerConnectionRef.current &&
                 peerConnectionRef.current.remoteDescription
               ) {
-                console.log("[CALLER] Remote ICE added", c);
+                console.log("[CALLER] Adding helper ICE", c);
                 void peerConnectionRef.current
                   .addIceCandidate(new RTCIceCandidate(c))
+                  .then(() => {
+                    console.log("[CALLER] Remote ICE added", c);
+                  })
                   .catch((error) => {
                     logException("[ERROR] addIceCandidate", error);
                     logException("ICE error", error);
@@ -346,6 +350,37 @@ export default function HelpPage() {
           });
         }
 
+        if (data.answer) {
+          console.log("[CALLER] Answer detected", snap.id);
+        }
+
+        if (
+          data.answer &&
+          peerConnectionRef.current &&
+          !peerConnectionRef.current.currentRemoteDescription
+        ) {
+          console.log("[CALLER] Applying remote answer", snap.id);
+          try {
+            await peerConnectionRef.current.setRemoteDescription(
+              new RTCSessionDescription(data.answer)
+            );
+          } catch (error) {
+            logException("[ERROR] setRemoteDescription", error);
+            throw error;
+          }
+          console.log("[CALLER] Remote answer applied", snap.id);
+
+          await flushPendingCandidates({
+            candidatesRef: pendingCalleeCandidates,
+            peerConnection: peerConnectionRef.current,
+            pendingLog: "[CALLER] Flushing pending ICE candidates",
+            addedLog: {
+              before: "[CALLER] Adding helper ICE",
+              after: "[CALLER] Remote ICE added",
+            },
+          });
+        }
+
         if (blindRedirected.current) return;
 
         blindRedirected.current = true;
@@ -355,29 +390,6 @@ export default function HelpPage() {
         speak("Helper connected");
         setMessage("Helper connected");
         console.log("Redirect blocked for WebRTC setup");
-
-        if (data.answer && peerConnectionRef.current) {
-          console.log("[CALLER] Answer received", snap.id);
-          try {
-            await peerConnectionRef.current.setRemoteDescription(
-              new RTCSessionDescription(data.answer)
-            );
-          } catch (error) {
-            logException("[ERROR] setRemoteDescription", error);
-            throw error;
-          }
-          console.log("[CALLER] Remote description set");
-
-          await flushPendingCandidates({
-            candidatesRef: pendingCalleeCandidates,
-            peerConnection: peerConnectionRef.current,
-            pendingLog: "[CALLER] Flushing pending ICE candidates",
-            addedLog: {
-              before: "[CALLER] Remote ICE added",
-              after: "[CALLER] Remote ICE added",
-            },
-          });
-        }
       }
     });
 
